@@ -1,0 +1,23 @@
+{
+  "skipTerminateQuickPick": true,
+  "skipSwitchToOutput": true,
+  "skipErrorMessage": false,
+  "commands": [
+    {
+      "text": "⬆️ Push",
+      "color": "yellow",
+      "command": "clasp push",
+      "alignment": "left",
+      "skipTerminateQuickPick": false,
+      "priority": 0
+    },
+    {
+      "text": "⬇️ Pull",
+      "color": "orange",
+      "command": "clasp pull",
+      "alignment": "left",
+      "skipTerminateQuickPick": false,
+      "priority": 0
+    }
+  ]
+}

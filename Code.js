@@ -70,6 +70,50 @@ function generateCalendar() {
   // Copy to save sheet
   saveRange.setValues(savedValues);
 
+  // Generate saved values map
+  log("Generate saved values map");
+  /** @type {Map<[Date, Date], Array<String>>} */
+  let savedDaysMap = Map();
+  /** @type {Map<[Date, Date], Array<String>>} */
+  let savedSelfDaysMap = Map();
+  let isSelfDay = false;
+  for (let row = 0; row < savedValues.length; row++) {
+
+    // Update isSelfDay and skip empty rows
+    if (newValues[row][CALENDAR.HOUR] == "") {
+      isSelfDay = (newValues[row][0] == SELF_DAYS_HEADER);
+      continue;
+    }
+
+    let savedRow = savedValues[row];
+    let savedDate = new Date();
+
+    // Get begin/end date
+    let savedDaySplit = savedRow[CALENDAR.DAY].trim().split(" ");
+    if (savedDaySplit.length > 1) {
+      updateDate(savedDate, savedDaySplit[savedDaySplit.length - 1]);
+    } else {
+      continue;
+    }
+
+    let savedEndDate = new Date();
+    let savedHourSplit = savedRow[CALENDAR.HOUR].split("-");
+    if (savedHourSplit.length > 1) {
+      updateTime(savedDate, savedHourSplit[0]);
+
+      savedEndDate.setFullYear(savedDate.getFullYear(), savedDate.getMonth(), savedDate.getDate());
+      updateTime(savedEndDate, savedHourSplit[1]);
+    } else {
+      continue;
+    }
+
+    if (isSelfDay) {
+      savedSelfDaysMap.set([savedDate, savedEndDate], savedRow);
+    } else {
+      savedDaysMap.set([savedDate, savedEndDate], savedRow);
+    }
+  }
+
   info("Calendrier sauvegardé");
 
   // -- Clear

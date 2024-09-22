@@ -60,7 +60,7 @@ function getDayIdx(s) {
 }
 
 /**
- * Update a date based on a formated date string.
+ * Update a date based on a formatted date string.
  * @param {Date} d The date to update
  * @param {String} str A french formatted date "DD[/MM[/YY[YY]]]"". All the missing elements are taken from the current date and time.
  */
@@ -75,7 +75,7 @@ function updateDate(d, str) {
 }
 
 /**
- * Update a date based on a formated time string.
+ * Update a date based on a formatted time string.
  * @param {Date} d The date to update
  * @param {String} str An hour in the format "HH[h[MM]]". All the missing elements are taken from the current date and time.
  */

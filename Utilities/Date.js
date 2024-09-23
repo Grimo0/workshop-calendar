@@ -59,6 +59,7 @@ function getDayIdx(s) {
   return -1;
 }
 
+
 /**
  * Update a date based on a formatted date string.
  * @param {Date} d The date to update
@@ -73,6 +74,7 @@ function updateDate(d, str) {
   else
     d.setDate(daySplit[0]);
 }
+
 
 /**
  * Update a date based on a formatted time string.

@@ -4,5 +4,5 @@
  * @returns {String} The formatted name
  */
 function formatName(name) {
-	return String(name).trimEnd();
+  return String(name).trimEnd();
 }

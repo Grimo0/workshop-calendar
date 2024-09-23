@@ -280,9 +280,10 @@ class GenerateParameters {
   /**
    * @param {String} peopleName
    * @param {number} slot
+   * @param {boolean} self
    * @param {number} days number of past days to add, default to 1.
    */
-  addPastDay(peopleName, slot, days = 1) {
+  addPastDay(peopleName, slot, self, days = 1) {
     if (peopleName == "" || peopleName == this.freeSlotCell.getDisplayValue() || peopleName == this.unavailableSlotCell.getDisplayValue())
       return;
 
@@ -290,11 +291,15 @@ class GenerateParameters {
     for (let row = 0; row < peopleNamesRows.length; row++) {
       if (peopleNamesRows[row][0] == peopleName) {
         if (slot < this.ceramistsSlotsName.length) {
-          this.ceramistsPastDays[row][0] += days;
-          this.ceramistsSelfPastDays[row][0] += days;
-        } else if (slot < this.ceramistsSlotsName.length + this.modelersSlotsName) {
-          this.modelersPastDays[row][0] += days;
-          this.modelersSelfPastDays[row][0] += days;
+          if (self)
+            this.ceramistsSelfPastDays[row][0] += days;
+          else
+            this.ceramistsPastDays[row][0] += days;
+        } else if (slot < this.ceramistsSlotsName.length + this.modelersSlotsName.length) {
+          if (self)
+            this.modelersSelfPastDays[row][0] += days;
+          else
+            this.modelersPastDays[row][0] += days;
         }
         return;
       }

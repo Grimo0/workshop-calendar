@@ -247,17 +247,38 @@ function generateCalendar() {
 
     log(`calendarRange filled.`);
 
+    // -- Update people "days to come" formula
+    if (true) {
+      log(`Update people "days to come" formula.`);
+      // TODO Update people "days to come" formula in the active people sheet.
+      // Formula is =COUNTIF('Calendrier Céramistes'!$D:$E; $A4) but $D:$E needs
+      // to be changed depending on the category (ceramists/modelers) and $A4 should match the curent row.
+    }
+
     // -- Update people past days counts
     if (UPDATE_PEOPLE_PAST_DAYS) {
+      log(`Incrementing people past days.`);
+      for (const [[b, e], r] of savedDaysMap) {
+        if (e.getTime() <= p.today.getTime()) {
+          for (let i = CALENDAR.SLOT; i < r.length; i++) {
+            p.addPastDay(formatName(r[i]), i - CALENDAR.SLOT, false);
+          }
+        }
+      }
+      for (const [[b, e], r] of savedSelfDaysMap) {
+        if (e.getTime() <= p.today.getTime()) {
+          for (let i = CALENDAR.SLOT; i < r.length; i++) {
+            p.addPastDay(formatName(r[i]), i - CALENDAR.SLOT, true);
+          }
+        }
+      }
+
+
       p.ceramistsPastDaysActiveRange.setValues(p.ceramistsPastDays);
       p.ceramistsSelfPastDaysActiveRange.setValues(p.ceramistsSelfPastDays);
       p.modelersPastDaysActiveRange.setValues(p.modelersPastDays);
       p.modelersSelfPastDaysActiveRange.setValues(p.modelersSelfPastDays);
       log(`People past days updated.`);
-
-      // TODO Update people "days to come" formula in the active people sheet.
-      // Formula is =COUNTIF('Calendrier Céramistes'!$D:$E; $A4) but $D:$E needs
-      // to be changed depending on the category (ceramists/modelers) and $A4 should match the curent row.
     }
 
     errorRange.clearContent();

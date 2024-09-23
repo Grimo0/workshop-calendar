@@ -39,7 +39,6 @@ function generateCalendar() {
   let p = new GenerateParameters(activeSpreadsheet, publicSpreadsheet);
 
   let startingWeekRow = 2;
-  let weekRow = startingWeekRow + 1;
   let weekCol = 1;
 
   // -- Set wip message
@@ -48,237 +47,205 @@ function generateCalendar() {
   let errorRange = activeSpreadsheet.getRangeByName("Erreurs");
   errorRange.setValue("MISE À JOUR EN COURS, ne PAS fermer la page");
 
-  info("Mise à jour démarrée, ne pas fermer la page.");
-
   // -- Update people list
   updatePeople(activeSpreadsheet, publicSpreadsheet, p.peopleNames);
 
+  info("Mise à jour démarrée, ne pas fermer la page.");
+
   // -- Copy people data from currently displayed weeks
   let calendarRange = calendarSheet.getRange(
-    startingWeekRow, weekCol,
+    startingWeekRow + 1, weekCol,
     calendarSheet.getMaxRows() - startingWeekRow + 1, calendarSheet.getMaxColumns() - weekCol + 1
   );
-  calendarRange.clearDataValidations();
-  calendarRange.setNumberFormat("@");
 
   let savedValues = calendarRange.getDisplayValues();
-  let saveRange = saveSheet.getRange(1, 1, calendarRange.getNumRows(), calendarRange.getNumColumns());
-  saveRange.clear();
-  saveRange.clearDataValidations();
-  saveRange.setNumberFormat("@");
+  let saveRange = saveSheet.getRange(1, 1, calendarRange.getNumRows(), calendarRange.getNumColumns())
+    .clear()
+    .clearDataValidations()
+    .setNumberFormat("@");
 
   // Copy to save sheet
   saveRange.setValues(savedValues);
 
-  // Generate saved values map
-  log("Generate saved values map");
-  /** @type {Map<[Date, Date], Array<String>>} */
-  let savedDaysMap = Map();
-  /** @type {Map<[Date, Date], Array<String>>} */
-  let savedSelfDaysMap = Map();
-  let isSelfDay = false;
-  for (let row = 0; row < savedValues.length; row++) {
-
-    // Update isSelfDay and skip empty rows
-    if (newValues[row][CALENDAR.HOUR] == "") {
-      isSelfDay = (newValues[row][0] == SELF_DAYS_HEADER);
-      continue;
-    }
-
-    let savedRow = savedValues[row];
-    let savedDate = new Date();
-
-    // Get begin/end date
-    let savedDaySplit = savedRow[CALENDAR.DAY].trim().split(" ");
-    if (savedDaySplit.length > 1) {
-      updateDate(savedDate, savedDaySplit[savedDaySplit.length - 1]);
-    } else {
-      continue;
-    }
-
-    let savedEndDate = new Date();
-    let savedHourSplit = savedRow[CALENDAR.HOUR].split("-");
-    if (savedHourSplit.length > 1) {
-      updateTime(savedDate, savedHourSplit[0]);
-
-      savedEndDate.setFullYear(savedDate.getFullYear(), savedDate.getMonth(), savedDate.getDate());
-      updateTime(savedEndDate, savedHourSplit[1]);
-    } else {
-      continue;
-    }
-
-    if (isSelfDay) {
-      savedSelfDaysMap.set([savedDate, savedEndDate], savedRow);
-    } else {
-      savedDaysMap.set([savedDate, savedEndDate], savedRow);
-    }
-  }
-
-  info("Calendrier sauvegardé");
-
-  // -- Clear
-  calendarRange.clear();
-  log(`Cleared the public calendar.`);
-
-  calendarSheet.setRowHeights(1, calendarSheet.getMaxRows(), 21);
+  log(`Calendar saved.`);
 
   // -- Try to update the sheet and if there is an issue, copy back the saved sheet
   try {
-    let weekNo = getWeekNumber(p.today);
+    // -- Clear
+    calendarRange.clear()
+      .clearDataValidations()
+      .setNumberFormat("@");
+    log(`Cleared the public calendar.`);
+
+    calendarSheet.setRowHeights(1, calendarSheet.getMaxRows(), 21);
+
+    // -- Generate saved values map
+    log(`Generate saved values map`);
+    let [savedDaysMap, savedSelfDaysMap] = getDaysMap(savedValues);
 
     // -- Create header
-    addHeaderToCalendar(p, calendarSheet, startingWeekRow, weekCol);
+    const headerNumRows = addHeaderToCalendar(p, calendarSheet, startingWeekRow, weekCol);
     log(`Added header.`);
+
+    let weekRow = startingWeekRow + headerNumRows;
+
+    /** @type {String[][]} */
+    let newValues = [];
+    /** @type {GoogleAppsScript.Spreadsheet.TextStyle[][]} */
+    let newTextStyles = [];
+    /** @type {String[][]} */
+    let newHorizontalAlignments = [];
+    /** @type {String[][]} */
+    let newVerticalAlignments = [];
+    /** @type {String[][]} */
+    let newBackgrounds = [];
+    /** @type {GoogleAppsScript.Spreadsheet.DataValidation[][]} */
+    let newDataValidations = [];
 
     // -- Add weeks calendars, starting from current
     let year = p.today.getFullYear();
+    let weekNo = getWeekNumber(p.today);
+    const nbCols = calendarSheet.getMaxColumns() - weekCol + 1;
     for (let weekIdx = 0; weekIdx < p.weeksToDisplay; weekIdx++) {
+
+      // Make sure weekNo is valid
       if (weekNo + weekIdx > 52) {
         year++;
         weekNo -= 52;
       }
-      weekRow += addWeekToCalendar(p, weekNo + weekIdx, year, calendarSheet, weekRow, weekCol);
-      log(`Added week ${weekNo + weekIdx} of ${year}.`)
-    }
 
-    // -- Insert back saved people data
-    if (KEEP_CALENDAR_DATA) {
-      let newValues = calendarRange.getDisplayValues();
-      let saveRow = 1;
-      let savedDate = new Date();
-      let savedEndDate = new Date();
-      let newDate = new Date();
-      let newEndDate = new Date();
+      const prevRow = weekRow;
 
-      for (let row = 0; row < newValues.length; row++) {
-        // We browse two arrays at the same time:
-        // `savedValues` which use `saveRow` as an index
-        // `newValues` which use `row` as an index
+      const dateOfWeek = getDateOfWeek(weekNo + weekIdx, year);
 
-        // We skip headers which only have their first cell filled
-        if (newValues[row][CALENDAR.HOUR] == "")
+      // -- Week subheader
+      newValues.push(createRowValues(nbCols, "Semaine " + (weekNo + weekIdx) + " - " + year));
+      newTextStyles.push(createRowValues(nbCols, p.subheaderTextStyle));
+      newHorizontalAlignments.push(createRowValues(nbCols, "center"));
+      newVerticalAlignments.push(createRowValues(nbCols, "middle"));
+      newBackgrounds.push(createRowValues(nbCols, p.subheaderBackground));
+      newDataValidations.push(createRowValues(nbCols));
+      let titleRange = calendarSheet.getRange(weekRow, weekCol, 1, nbCols)
+        .mergeAcross()
+        .setBorder(true, true, true, true, false, false, p.borderColor, null);
+
+      weekRow += 1;
+
+      // -- Regular openings
+      for (let openingTime of p.openingTimes) {
+        let begin = openingTime.getBeginInWeek(dateOfWeek);
+        let end = openingTime.getEndInWeek(dateOfWeek);
+
+        // Don't add the slot if closed
+        if (p.isClosed(begin, end)) {
+          log(`Not opened between ${begin} and ${end}.`);
           continue;
-
-        // We skip saved rows with empty slots
-        while (saveRow < savedValues.length && savedValues[saveRow][CALENDAR.HOUR] == "") {
-          saveRow++;
         }
 
-        // All saved data have been inserted
-        if (saveRow >= savedValues.length)
-          break;
+        if (KEEP_CALENDAR_DATA)
+          newValues.push(createOpeningRow(nbCols, openingTime, begin, end, p, savedDaysMap));
+        else
+          newValues.push(createOpeningRow(nbCols, openingTime, begin, end, p));
+        newTextStyles.push(createRowValues(nbCols, [null, p.dayTextStyle, p.hoursTextStyle]));
+        newHorizontalAlignments.push(createRowValues(nbCols, [null, "center", "center"]));
+        newVerticalAlignments.push(createRowValues(nbCols, "middle", true));
+        newBackgrounds.push(createRowValues(nbCols, [null, openingTime.dayColor, openingTime.hourColor]));
+        newDataValidations.push(createRowValues(nbCols, [null, null, null, p.peopleRule], true));
 
-        // If the new row does not match the saved one, there was a deletion or addition
-        if (newValues[row][CALENDAR.DAY] != savedValues[saveRow][CALENDAR.DAY]
-          || newValues[row][CALENDAR.HOUR] != savedValues[saveRow][CALENDAR.HOUR]) {
-          // Check the saved row:
-          // If the saved date is further in the future than the new one, a new row was added
-          // and we just don't increase `saveRow` as we wait for `row` to catch up.
-          // If the saved date is further in the past than the new one, the saved row was deleted
-          // and we must look for the next matching saved row.
-
-          let savedRow = savedValues[saveRow];
-
-          let savedDaySplit = savedRow[CALENDAR.DAY].trim().split(" ");
-          if (savedDaySplit.length > 1)
-            updateDate(savedDate, savedDaySplit[savedDaySplit.length - 1]);
-          let savedHourSplit = savedRow[CALENDAR.HOUR].split("-");
-          if (savedHourSplit.length > 1)
-            updateTime(savedDate, savedHourSplit[0]);
-
-          let newRow = newValues[row];
-
-          let newDaySplit = newRow[CALENDAR.DAY].trim().split(" ");
-          if (newDaySplit.length > 1)
-            updateDate(newEndDate, newDaySplit[newDaySplit.length - 1]);
-          let newHourSplit = newRow[CALENDAR.HOUR].split("-");
-          if (newHourSplit.length > 1)
-            updateTime(newEndDate, newHourSplit[1]);
-
-          // If the saved date is further in the future than the new one, a new row was added.
-          // We continue and don't increase `saveRow` as we wait for `row` to catch up.
-          if (savedDate >= newEndDate)
-            continue;
-
-          if (savedHourSplit.length > 1) {
-            savedEndDate.setFullYear(savedDate.getFullYear(), savedDate.getMonth(), savedDate.getDate());
-            updateTime(savedEndDate, savedHourSplit[1]);
-          }
-
-          if (newHourSplit.length > 1) {
-            newDate.setFullYear(newEndDate.getFullYear(), newEndDate.getMonth(), newEndDate.getDate());
-            updateTime(newDate, newHourSplit[0]);
-          }
-
-          // If the saved date is further in the past than the new one, the saved row was deleted.
-          // We must look for the next matching saved row and discard the old ones.
-          if (savedEndDate <= newDate) {
-            let saveIsOlder = false;
-
-            for (let r = saveRow + 1; r < savedValues.length; r++) {
-
-              // Increase the people past days counter if the saved date is older than today
-              if (savedDate < p.today) {
-                for (let s = 0; s < p.ceramistsSlotsName.length; s++) {
-                  p.addPastDay(savedValues[r - 1][CALENDAR.SLOT + s], s);
-                }
-
-                for (let s = 0; s < p.modelersSlotsName.length; s++) {
-                  p.addPastDay(savedValues[r - 1][CALENDAR.SLOT + s], s);
-                }
-                log(`Past day ${savedDate}.`)
-              }
-
-              // Skip headers and rows of the same day/hour that list the slots
-              if (savedValues[r][CALENDAR.HOUR] == "")
-                continue;
-
-              savedRow = savedValues[r];
-
-              savedDaySplit = savedRow[CALENDAR.DAY].trim().split(" ");
-              if (savedDaySplit.length > 1)
-                updateDate(savedDate, savedDaySplit[savedDaySplit.length - 1]);
-              savedHourSplit = savedRow[CALENDAR.HOUR].trim().split("-");
-              if (savedHourSplit.length > 1) {
-                updateTime(savedDate, savedHourSplit[0]);
-
-                savedEndDate.setFullYear(savedDate.getFullYear(), savedDate.getMonth(), savedDate.getDate());
-                updateTime(savedEndDate, savedHourSplit[1]);
-              }
-
-              // Does the save date now overlap with the new one?
-              if (savedDate < newEndDate && savedEndDate > newDate) {
-                saveRow = r;
-                break;
-              }
-
-              // Is the save date now further in the future than the new date?
-              if (savedDate >= newEndDate) {
-                saveRow = r;
-                saveIsOlder = true;
-                break;
-              }
-            }
-            // The next save date is further in the future than the new one.
-            // We continue and don't increase `saveRow` anymore as we wait for `row` to catch up.
-            if (saveIsOlder)
-              continue;
-
-            // Now the saved date overlap with the new one so we can take data from the save.
-          }
-        }
-
-        // Copy from the save
-        for (let slot = 0; slot < p.slotsNames.length; slot++) {
-          if (savedValues[saveRow][CALENDAR.SLOT + slot] != "")
-            newValues[row][CALENDAR.SLOT + slot] = formatName(savedValues[saveRow][CALENDAR.SLOT + slot]);
-        }
-        saveRow++;
+        weekRow += 1;
       }
 
-      calendarRange.setValues(newValues);
-      log(`Calendar data restored.`);
+      // -- Self-openings
+      let separatorInserted = false;
+      for (let openingTime of p.selfopeningTimes) {
+        let begin = openingTime.getBeginInWeek(dateOfWeek);
+        let end = openingTime.getEndInWeek(dateOfWeek);
+
+        // Don't add the slot if closed
+        if (p.isClosed(begin, end)) {
+          log(`Not opened between ${begin} and ${end}.`);
+          continue;
+        }
+
+        // Separator
+        if (!separatorInserted) {
+          separatorInserted = true;
+
+          newValues.push(createRowValues(nbCols, SELF_DAYS_HEADER));
+          newTextStyles.push(createRowValues(nbCols, p.separatorTextStyle));
+          newHorizontalAlignments.push(createRowValues(nbCols, "center"));
+          newVerticalAlignments.push(createRowValues(nbCols, "middle"));
+          newBackgrounds.push(createRowValues(nbCols, p.separatorBackground));
+          newDataValidations.push(createRowValues(nbCols));
+          let separatorRange = calendarSheet.getRange(weekRow, weekCol, 1, nbCols)
+            .mergeAcross()
+            .setBorder(true, true, true, true, false, false, p.borderColor, null);
+
+          weekRow += 1;
+        }
+
+        if (KEEP_CALENDAR_DATA)
+          newValues.push(createOpeningRow(nbCols, openingTime, begin, end, p, savedSelfDaysMap));
+        else
+          newValues.push(createOpeningRow(nbCols, openingTime, begin, end, p));
+        newTextStyles.push(createRowValues(nbCols, [null, p.dayTextStyle, p.hoursTextStyle]));
+        newHorizontalAlignments.push(createRowValues(nbCols, [null, "center", "center"]));
+        newVerticalAlignments.push(createRowValues(nbCols, "middle", true));
+        newBackgrounds.push(createRowValues(nbCols, [null, openingTime.dayColor, openingTime.hourColor]));
+        newDataValidations.push(createRowValues(nbCols, [null, null, null, p.peopleRule], true));
+
+        weekRow += 1;
+      }
+
+      log(`Added ${weekRow - prevRow} row for week ${weekNo + weekIdx} of ${year}.`);
     }
+
+    log(`${weekRow - calendarRange.getRow()} rows filled.`);
+
+    for (let i = weekRow - calendarRange.getRow(); i < calendarRange.getNumRows(); i++) {
+      newValues.push(Array(nbCols));
+      newTextStyles.push(Array(nbCols));
+      newHorizontalAlignments.push(Array(nbCols));
+      newVerticalAlignments.push(Array(nbCols));
+      newBackgrounds.push(Array(nbCols));
+      newDataValidations.push(Array(nbCols));
+    }
+
+    log(`Completed with ${calendarRange.getNumRows() - (weekRow - calendarRange.getRow())} empty rows for a total of ${calendarRange.getNumRows()}.`);
+
+    if (newValues.length != calendarRange.getNumRows()) {
+      throw new RangeError(`Inconsitent number of rows given as newValues (${newValues.length} while expecting ${calendarRange.getNumRows()}).`);
+    }
+    else if (newTextStyles.length != calendarRange.getNumRows()) {
+      throw new RangeError(`Inconsitent number of rows given as newTextStyles (${newTextStyles.length} while expecting ${calendarRange.getNumRows()}).`);
+    }
+    else if (newHorizontalAlignments.length != calendarRange.getNumRows()) {
+      throw new RangeError(`Inconsitent number of rows given as newHorizontalAlignments (${newHorizontalAlignments.length} while expecting ${calendarRange.getNumRows()}).`);
+    }
+    else if (newVerticalAlignments.length != calendarRange.getNumRows()) {
+      throw new RangeError(`Inconsitent number of rows given as newVerticalAlignments (${newVerticalAlignments.length} while expecting ${calendarRange.getNumRows()}).`);
+    }
+    else if (newBackgrounds.length != calendarRange.getNumRows()) {
+      throw new RangeError(`Inconsitent number of rows given as newBackgrounds (${newBackgrounds.length} while expecting ${calendarRange.getNumRows()}).`);
+    }
+    else if (newDataValidations.length != calendarRange.getNumRows()) {
+      throw new RangeError(`Inconsitent number of rows given as newDataValidations (${newDataValidations.length} while expecting ${calendarRange.getNumRows()}).`);
+    }
+
+    log(`Setting calendarRange newValues.`);
+    calendarRange.setValues(newValues);
+    log(`Setting calendarRange newTextStyles.`);
+    calendarRange.setTextStyles(newTextStyles);
+    log(`Setting calendarRange newHorizontalAlignments.`);
+    calendarRange.setHorizontalAlignments(newHorizontalAlignments);
+    log(`Setting calendarRange newVerticalAlignments.`);
+    calendarRange.setVerticalAlignments(newVerticalAlignments);
+    log(`Setting calendarRange newBackgrounds.`);
+    calendarRange.setBackgrounds(newBackgrounds);
+    log(`Setting calendarRange newDataValidations.`);
+    calendarRange.setDataValidations(newDataValidations);
+
+    log(`calendarRange filled.`);
 
     // -- Update people past days counts
     if (UPDATE_PEOPLE_PAST_DAYS) {
@@ -346,6 +313,7 @@ function generateCalendar() {
   info("Mise à jour terminée !");
 }
 
+
 /**
  * Only update people without generating the calendar again.
  */
@@ -368,6 +336,7 @@ function updatePeopleOnly() {
 
   info("Mise à jour terminée !");
 }
+
 
 /**
  * Update people's data on the public spreadsheet using the active's one.
@@ -403,17 +372,19 @@ function updatePeople(activeSpreadsheet, publicSpreadsheet, peopleNames) {
     peoplePublicSheet.insertRows(peoplePublicSheet.getMaxRows(), publicValues.length - peoplePublicSheet.getMaxRows());
   }
 
-  let publicRange = peoplePublicSheet.getRange(1, 1, publicValues.length);
-  publicRange.setValues(publicValues);
+  let publicRange = peoplePublicSheet.getRange(1, 1, publicValues.length)
+    .setValues(publicValues);
 }
 
+
 /**
- * Add the formated week to calendarSheet and returns the number of edited rows.
+ * Add the header to `calendarSheet`.
  * @param {GenerateParameters} p
  * @param {GoogleAppsScript.Spreadsheet.Sheet} calendarSheet
  * @param {number} weekRow
  * @param {number} weekCol
- * @OnlyCurrentDoc */
+ * @returns {number} The number of rows created for the header
+ */
 function addHeaderToCalendar(p, calendarSheet, weekRow, weekCol) {
   // -- Update the number of cols based on the nb of slots
   if (calendarSheet.getMaxColumns() > CALENDAR.SLOT + p.slotsNames.length) {
@@ -429,216 +400,126 @@ function addHeaderToCalendar(p, calendarSheet, weekRow, weekCol) {
   }
 
   // -- Merge first cells
-  let firstRange = calendarSheet.getRange(weekRow, weekCol, 1, CALENDAR.SLOT);
-  firstRange.mergeAcross();
-  firstRange.setHorizontalAlignment("center");
-  firstRange.setVerticalAlignment("middle");
-  firstRange.setBackground(p.headerBackground);
-  firstRange.setBorder(true, true, true, true, false, false, p.borderColor, null);
+  let firstRange = calendarSheet.getRange(weekRow, weekCol, 1, CALENDAR.SLOT)
+    .mergeAcross()
+    .setHorizontalAlignment("center")
+    .setVerticalAlignment("middle")
+    .setBackground(p.headerBackground)
+    .setBorder(true, true, true, true, false, false, p.borderColor, null);
   weekCol += CALENDAR.SLOT
 
   // -- Set slots names
-  let slotsRange = calendarSheet.getRange(weekRow, weekCol, 1, p.slotsNames.length);
-  slotsRange.setTextStyle(p.headerTextStyle);
-  slotsRange.setHorizontalAlignment("center");
-  slotsRange.setVerticalAlignment("middle");
-  slotsRange.setBackground(p.headerBackground);
-  slotsRange.setBorder(true, true, true, true, true, false, p.borderColor, null);
-  slotsRange.setValues([p.slotsNames])
+  let slotsRange = calendarSheet.getRange(weekRow, weekCol, 1, p.slotsNames.length)
+    .setTextStyle(p.headerTextStyle)
+    .setHorizontalAlignment("center")
+    .setVerticalAlignment("middle")
+    .setBackground(p.headerBackground)
+    .setBorder(true, true, true, true, true, false, p.borderColor, null)
+    .setValues([p.slotsNames])
+
+  return 1;
 }
 
 
 /**
- * Add the formated week to calendarSheet and returns the number of edited rows.
+ * Create and return an array of `nbCols` length and fill it with `values`.
+ * @template T
+ * @param {number} nbCols
+ * @param {T[] | T} value
+ * @param {boolean} repeat Should the value (or the last in case of an array) be repeated to fill the row.
+ * @returns {T[]}
+ */
+function createRowValues(nbCols, value = null, repeat = false) {
+  /** @type {T[]} */
+  let newRow = Array(nbCols);
+
+  if (Array.isArray(value)) {
+    if (nbCols < value.length)
+      throw new RangeError(`Trying to create a row with not enought cols (${nbCols} given while expecting at least ${value.length}).`);
+
+    for (let i = 0; i < value.length; i++) {
+      newRow[i] = value[i];
+    }
+
+    if (repeat && value.length > 0) {
+      let v = value[value.length - 1];
+      for (let i = value.length; i < nbCols; i++) {
+        newRow[i] = v;
+      }
+    }
+  }
+  else {
+    if (repeat) {
+      newRow.fill(value, 0, nbCols);
+    } else {
+      newRow[0] = value;
+    }
+  }
+
+  return newRow;
+}
+
+
+/**
+ * Create and return an initialized array for an opening row.
+ * @param {number} nbCols
+ * @param {OpeningTime} openingTime
+ * @param {Date} begin
+ * @param {Date} end
  * @param {GenerateParameters} p
- * @param {number} weekNo
- * @param {number} year
- * @param {GoogleAppsScript.Spreadsheet.Sheet} calendarSheet
- * @param {number} weekRow
- * @param {number} weekCol
- * @return {number} The number of edited rows (1 for the title + number of opening [+ subheader + number of self opening])
- * @OnlyCurrentDoc */
-function addWeekToCalendar(p, weekNo, year, calendarSheet, weekRow, weekCol) {
-  let nbCols = calendarSheet.getMaxColumns() - weekCol + 1;
+ * @param {Map<[Date, Date], Array<String>>} savedMap
+ * @returns {String[]}
+ */
+function createOpeningRow(nbCols, openingTime, begin, end, p, savedMap = null) {
+  if (nbCols < CALENDAR.SLOT + p.slotsNames.length)
+    throw new RangeError(`Trying to create an opening row with not enought cols (${nbCols} given while expecting at least ${CALENDAR.SLOT + p.slotsNames.length}).`);
 
-  let dateOfWeek = getDateOfWeek(weekNo, year);
+  /** @type {String[]} */
+  let newRow = Array(nbCols);
 
-  // -- Set the title
-  let titleRange = calendarSheet.getRange(weekRow, weekCol, 1, nbCols);
-  titleRange.mergeAcross();
-  titleRange.setValue("Semaine " + weekNo + " - " + year);
-  titleRange.setTextStyle(p.headerTextStyle);
-  titleRange.setHorizontalAlignment("center");
-  titleRange.setVerticalAlignment("middle");
-  titleRange.setBackground(p.subheaderBackground);
-  titleRange.setBorder(true, true, true, true, false, false, p.borderColor, null);
+  newRow[CALENDAR.TYPE] = openingTime.type;
 
-  weekRow += 1;
-  let currentRow = weekRow;
+  newRow[CALENDAR.DAY] =
+    openingTime.dayName
+    + " " + begin.getDate()
+    + "/" + (begin.getMonth() + 1).toString().padStart(2, 0);
 
-  // -- Generate one line per opening time
+  newRow[CALENDAR.HOUR] =
+    begin.getHours() + (begin.getMinutes() > 0 ? "h" + begin.getMinutes() : "h")
+    + "-" + end.getHours() + (end.getMinutes() > 0 ? "h" + end.getMinutes() : "h");
 
-  let daysBgs = Array();
-  let hoursBgs = Array();
-
-  // Regular openings
-  let openingsValues = Array();
-  for (let openingTime of p.openingTimes) {
-    let begin = new Date(
-      dateOfWeek.getFullYear(),
-      dateOfWeek.getMonth(),
-      dateOfWeek.getDate() + openingTime.dayOfWeek,
-      openingTime.begin.getHours(),
-      openingTime.begin.getMinutes()
-    );
-
-    let end = new Date(
-      dateOfWeek.getFullYear(),
-      dateOfWeek.getMonth(),
-      dateOfWeek.getDate() + openingTime.dayOfWeek,
-      openingTime.end.getHours(),
-      openingTime.end.getMinutes()
-    );
-
-    // Don't add the slots if closed
-    let skipSlot = false;
-    for (let closedTime of p.closedTimes) {
-      if (end.getTime() >= closedTime.begin.getTime()
-        && begin.getTime() <= closedTime.end.getTime()) {
-        skipSlot = true;
+  if (savedMap) {
+    // Get data from the save
+    /** @type {String[]} */
+    let savedRow = null;
+    for (const [[b, e], r] of savedMap) {
+      // If the save overlaps a saved opening time
+      if (b.getTime() < end.getTime() && e.getTime() > begin.getTime()) {
+        savedRow = r;
         break;
       }
     }
-    if (skipSlot)
-      continue;
 
-    // Set opening values
-    let opening = Array(nbCols);
-    let dayName = openingTime.dayName;
-    opening[CALENDAR.TYPE] = OPENING_TYPE.REGULAR;
-    opening[CALENDAR.DAY] =
-      dayName.slice(0, 1).toUpperCase() + dayName.slice(1, 3)
-      + " " + begin.getDate()
-      + "/" + (begin.getMonth() + 1).toString().padStart(2, 0);
-    opening[CALENDAR.HOUR] =
-      begin.getHours() + (begin.getMinutes() > 0 ? "h" + begin.getMinutes() : "h")
-      + "-" + end.getHours() + (end.getMinutes() > 0 ? "h" + end.getMinutes() : "h");
-    for (let i = 0; i < p.slotsNames.length; i++) {
-      opening[CALENDAR.SLOT + i] = p.freeSlotCell.getDisplayValue();
-    }
-
-    openingsValues.push(opening);
-
-    daysBgs.push([openingTime.dayColor]);
-    hoursBgs.push([openingTime.hourColor]);
-
-    currentRow += 1;
-  }
-
-  // Skip the subheader
-  daysBgs.push([null]);
-  hoursBgs.push([null]);
-  currentRow += 1;
-
-  // Self-openings
-  let selfopeningsValues = Array();
-  for (let openingTime of p.selfopeningTimes) {
-    let begin = new Date(
-      dateOfWeek.getFullYear(),
-      dateOfWeek.getMonth(),
-      dateOfWeek.getDate() + openingTime.dayOfWeek,
-      openingTime.begin.getHours(),
-      openingTime.begin.getMinutes()
-    );
-
-    let end = new Date(
-      dateOfWeek.getFullYear(),
-      dateOfWeek.getMonth(),
-      dateOfWeek.getDate() + openingTime.dayOfWeek,
-      openingTime.end.getHours(),
-      openingTime.end.getMinutes()
-    );
-
-    // Don't add the slots if closed
-    let skipSlot = false;
-    for (let closedTime of p.closedTimes) {
-      if (end.getTime() >= closedTime.begin.getTime()
-        && begin.getTime() <= closedTime.end.getTime()) {
-        skipSlot = true;
-        break;
+    // Add the saved data and fill the other slots with FreeSlot
+    if (savedRow) {
+      for (let i = CALENDAR.SLOT; i < savedRow.length; i++) {
+        newRow[i] = formatName(savedRow[i]);
+      }
+      for (let i = savedRow.length; i < p.slotsNames.length; i++) {
+        newRow[i] = p.freeSlotCell.getDisplayValue();
       }
     }
-    if (skipSlot)
-      continue;
-
-    // Set opening values
-    let opening = Array(nbCols);
-    let dayName = openingTime.dayName;
-    opening[CALENDAR.TYPE] = OPENING_TYPE.SELF;
-    opening[CALENDAR.DAY] =
-      dayName.slice(0, 1).toUpperCase() + dayName.slice(1, 3)
-      + " " + begin.getDate()
-      + "/" + (begin.getMonth() + 1).toString().padStart(2, 0);
-    opening[CALENDAR.HOUR] =
-      begin.getHours() + (begin.getMinutes() > 0 ? "h" + begin.getMinutes() : "h")
-      + "-" + end.getHours() + (end.getMinutes() > 0 ? "h" + end.getMinutes() : "h");
-    for (let i = 0; i < p.slotsNames.length; i++) {
-      opening[CALENDAR.SLOT + i] = p.freeSlotCell.getDisplayValue();
+    else {
+      for (let i = 0; i < p.slotsNames.length; i++) {
+        newRow[CALENDAR.SLOT + i] = p.freeSlotCell.getDisplayValue();
+      }
     }
-
-    selfopeningsValues.push(opening);
-
-    daysBgs.push([openingTime.dayColor]);
-    hoursBgs.push([openingTime.hourColor]);
-
-    currentRow += 1;
+  }
+  else {
+    for (let i = 0; i < p.slotsNames.length; i++) {
+      newRow[CALENDAR.SLOT + i] = p.freeSlotCell.getDisplayValue();
+    }
   }
 
-  // -- If there is no slot available this week, skip it
-  if (openingsValues.length == 0 && selfopeningsValues.length == 0)
-    return 1;
-
-  // -- Insert the values in the range of the week's calendar
-  // Openings
-  let openingsRange = calendarSheet.getRange(weekRow, weekCol, openingsValues.length, nbCols);
-  openingsRange.setValues(openingsValues);
-
-  // Separator
-  let separatorRange = calendarSheet.getRange(weekRow + openingsValues.length, weekCol, 1, nbCols);
-  separatorRange.mergeAcross();
-  separatorRange.setValue(SELF_DAYS_HEADER);
-  separatorRange.setTextStyle(p.subheaderTextStyle);
-  separatorRange.setHorizontalAlignment("center");
-  separatorRange.setVerticalAlignment("middle");
-  separatorRange.setBackground(p.subheaderBackground);
-  separatorRange.setBorder(true, true, true, true, false, false, p.borderColor, null);
-
-  // Self-openings
-  let selfopeningsRange = calendarSheet.getRange(weekRow + openingsValues.length + 1, weekCol, selfopeningsValues.length, nbCols);
-  selfopeningsRange.setValues(selfopeningsValues);
-
-  // -- Format & styles
-
-  // Day
-  let daysRange = calendarSheet.getRange(weekRow, weekCol + CALENDAR.DAY, currentRow - weekRow, 1);
-  daysRange.setTextStyle(p.dayTextStyle);
-  daysRange.setHorizontalAlignment("center");
-  daysRange.setVerticalAlignment("middle");
-  daysRange.setBackgrounds(daysBgs);
-  // daysRange.setBorder(null, true, null, null, null, null, p.borderColor, null);
-
-  // Hours
-  let hoursRange = calendarSheet.getRange(weekRow, weekCol + CALENDAR.HOUR, currentRow - weekRow, 1);
-  hoursRange.setTextStyle(p.hoursTextStyle);
-  hoursRange.setHorizontalAlignment("center");
-  hoursRange.setVerticalAlignment("middle");
-  hoursRange.setBackgrounds(hoursBgs);
-
-  // Slots
-  let ceramistsSlotsRange = calendarSheet.getRange(weekRow, weekCol + CALENDAR.SLOT, currentRow - weekRow, p.slotsNames.length);
-  ceramistsSlotsRange.setVerticalAlignment("middle");
-  ceramistsSlotsRange.setBackground(null);
-  ceramistsSlotsRange.setDataValidation(p.peopleRule);
-
-  return titleRange.getNumRows() + currentRow - weekRow;
+  return newRow;
 }

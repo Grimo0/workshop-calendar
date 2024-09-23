@@ -37,13 +37,15 @@ class ClosedTime {
 
 class OpeningTime {
   /**
+   * @param {String} type
    * @param {String} dayName Must contain the french name. Used to name the day but also to get the day index.
    * @param {Date} begin
    * @param {Date} end
    * @param {String} dayColor
    */
-  constructor(dayName, begin, end, dayColor) {
-    this.dayName = dayName;
+  constructor(type, dayName, begin, end, dayColor) {
+    this.type = type;
+    this.dayName = dayName.slice(0, 1).toUpperCase() + dayName.slice(1, 3);
     this.dayOfWeek = getDayIdx(dayName);
     this.begin = begin;
     this.end = end;
@@ -57,6 +59,36 @@ class OpeningTime {
     g += Math.round((255 - g) / 3);
     b += Math.round((255 - b) / 3);
     this.hourColor = "#" + r.toString(16) + g.toString(16) + b.toString(16);
+  }
+
+
+  /**
+   * @param {Date} dateOfWeek
+   * @returns {Date}
+   */
+  getBeginInWeek(dateOfWeek) {
+    return new Date(
+      dateOfWeek.getFullYear(),
+      dateOfWeek.getMonth(),
+      dateOfWeek.getDate() + this.dayOfWeek,
+      this.begin.getHours(),
+      this.begin.getMinutes()
+    );
+  }
+
+
+  /**
+   * @param {Date} dateOfWeek
+   * @returns {Date}
+   */
+  getEndInWeek(dateOfWeek) {
+    return new Date(
+      dateOfWeek.getFullYear(),
+      dateOfWeek.getMonth(),
+      dateOfWeek.getDate() + this.dayOfWeek,
+      this.end.getHours(),
+      this.end.getMinutes()
+    );
   }
 }
 
@@ -147,7 +179,7 @@ class GenerateParameters {
 
       let dayColor = openingsRange.getCell(1 + row, 1 + OPENING.DAY).getBackground();
 
-      this.openingTimes.push(new OpeningTime(openingRow[OPENING.DAY], begin, end, dayColor));
+      this.openingTimes.push(new OpeningTime(OPENING_TYPE.REGULAR, openingRow[OPENING.DAY], begin, end, dayColor));
     }
 
     // -- Self-Opening times
@@ -168,7 +200,7 @@ class GenerateParameters {
 
       let dayColor = selfopeningsRange.getCell(1 + row, 1 + OPENING.DAY).getBackground();
 
-      this.selfopeningTimes.push(new OpeningTime(openingRow[OPENING.DAY], begin, end, dayColor));
+      this.selfopeningTimes.push(new OpeningTime(OPENING_TYPE.SELF, openingRow[OPENING.DAY], begin, end, dayColor));
     }
 
     // -- Closed times
@@ -204,6 +236,7 @@ class GenerateParameters {
     // -- Styles
     this.headerBackground = "#d9d9d9";
     this.subheaderBackground = "#e9e9e9";
+    this.separatorBackground = "#e9e9e9";
     this.borderColor = "#777777";
 
     this.headerTextStyle = SpreadsheetApp.newTextStyle()
@@ -211,6 +244,10 @@ class GenerateParameters {
       .setFontSize(12)
       .build();
     this.subheaderTextStyle = SpreadsheetApp.newTextStyle()
+      .setBold(true)
+      .setFontSize(12)
+      .build();
+    this.separatorTextStyle = SpreadsheetApp.newTextStyle()
       .setFontSize(11)
       .build();
     this.dayTextStyle = SpreadsheetApp.newTextStyle()
@@ -223,12 +260,29 @@ class GenerateParameters {
       .build();
   }
 
+
+  /**
+   * @param {Date} begin
+   * @param {Date} end
+   * @returns {boolean}
+   */
+  isClosed(begin, end) {
+    for (let closedTime of this.closedTimes) {
+      if (end.getTime() >= closedTime.begin.getTime()
+        && begin.getTime() <= closedTime.end.getTime()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+
   /**
    * @param {String} peopleName
    * @param {number} slot
    * @param {number} days number of past days to add, default to 1.
    */
-  addPastDay(peopleName, slot, days=1) {
+  addPastDay(peopleName, slot, days = 1) {
     if (peopleName == "" || peopleName == this.freeSlotCell.getDisplayValue() || peopleName == this.unavailableSlotCell.getDisplayValue())
       return;
 

@@ -1,7 +1,7 @@
 
 /**
  * @param {GoogleAppsScript.Spreadsheet.Range} range
- * @return {Number[][]}
+ * @returns {Number[][]}
  */
 function getValuesAsNumber(range) {
 	/** @type {Number[][]} */
@@ -22,7 +22,7 @@ function getValuesAsNumber(range) {
 
 /**
  * @param {GoogleAppsScript.Spreadsheet.Range} range
- * @return {String[]}
+ * @returns {String[]}
  */
 function getFlatDisplayValues(range) {
 	/** @type {String[]} */
@@ -38,4 +38,54 @@ function getFlatDisplayValues(range) {
 			rv.push(converted_row)
 	}
 	return rv
+}
+
+/**
+ * @param {String[][]} values
+ * @returns {[Map<[Date, Date], Array<String>>, Map<[Date, Date], Array<String>>]} [daysMap, selfDaysMap]
+ */
+function getDaysMap(values) {
+  /** @type {Map<[Date, Date], Array<String>>} */
+  let daysMap = new Map();
+  /** @type {Map<[Date, Date], Array<String>>} */
+  let selfDaysMap = new Map();
+  let isSelfDay = false;
+  for (let r = 0; r < values.length; r++) {
+
+    // Update isSelfDay and skip empty rows
+    if (values[r][CALENDAR.HOUR] == "") {
+      isSelfDay = (values[r][0] == SELF_DAYS_HEADER);
+      continue;
+    }
+
+    let row = values[r];
+    let beginDate = new Date();
+
+    // Get begin/end date
+    let daySplit = row[CALENDAR.DAY].trim().split(" ");
+    if (daySplit.length > 1) {
+      updateDate(beginDate, daySplit[daySplit.length - 1]);
+    } else {
+      continue;
+    }
+
+    let endDate = new Date();
+    let hourSplit = row[CALENDAR.HOUR].split("-");
+    if (hourSplit.length > 1) {
+      updateTime(beginDate, hourSplit[0]);
+
+      endDate.setFullYear(beginDate.getFullYear(), beginDate.getMonth(), beginDate.getDate());
+      updateTime(endDate, hourSplit[1]);
+    } else {
+      continue;
+    }
+
+    if (isSelfDay) {
+      selfDaysMap.set([beginDate, endDate], row);
+    } else {
+      daysMap.set([beginDate, endDate], row);
+    }
+  }
+
+  return [daysMap, selfDaysMap]
 }

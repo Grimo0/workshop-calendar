@@ -2,7 +2,7 @@
 /**
  * @param {number} weekNumber
  * @param {number} year
- * @return {Date} The date of the monday in the given week
+ * @returns {Date} The date of the monday in the given week
  */
 function getDateOfWeek(weekNumber, year) {
   var date = new Date(year, 0, 1 + (weekNumber - 1) * 7); // 1st of January + 7 days for each week
@@ -18,7 +18,7 @@ function getDateOfWeek(weekNumber, year) {
 
 /**
  * @param {Date} d
- * @return {number} The number of the week considering that they starts on monday
+ * @returns {number} The number of the week considering that they starts on monday
  * and the first week of the year contains the first Thursday
  */
 function getWeekNumber(d) {
@@ -38,7 +38,7 @@ function getWeekNumber(d) {
 
 /**
  * @param {String} s Must be the name of the day in french (case don't matter).
- * @return {number} The 0 indexed placement of the day in the week or -1 if the name is invalid
+ * @returns {number} The 0 indexed placement of the day in the week or -1 if the name is invalid
  */
 function getDayIdx(s) {
   var s = s.toUpperCase();

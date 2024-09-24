@@ -105,24 +105,9 @@ class GenerateParameters {
     let peopleActiveSheet = activeSpreadsheet.getSheetByName(PEOPLE_SHEET_NAME);
 
     // -- Get Slots name
-    let ceramistsSlotsName = activeSpreadsheet.getRangeByName('NomsColonnesTourneurs').getDisplayValues();
-    this.ceramistsSlotsName = Array();
-    for (let row = 0; row < ceramistsSlotsName.length; row++) {
-      if (ceramistsSlotsName[row][0])
-        this.ceramistsSlotsName.push(ceramistsSlotsName[row][0]);
-    }
-    let modelersSlotsName = activeSpreadsheet.getRangeByName('NomsColonnesModeleurs').getDisplayValues();
-    this.modelersSlotsName = Array();
-    for (let row = 0; row < modelersSlotsName.length; row++) {
-      if (modelersSlotsName[row][0])
-        this.modelersSlotsName.push(modelersSlotsName[row][0]);
-    }
-    let othersSlotsName = activeSpreadsheet.getRangeByName('NomsColonnesAutres').getDisplayValues();
-    this.othersSlotsName = Array();
-    for (let row = 0; row < othersSlotsName.length; row++) {
-      if (othersSlotsName[row][0])
-        this.othersSlotsName.push(othersSlotsName[row][0]);
-    }
+    this.ceramistsSlotsName = getFlatDisplayValues(activeSpreadsheet.getRangeByName('NomsColonnesTourneurs'));
+    this.modelersSlotsName = getFlatDisplayValues(activeSpreadsheet.getRangeByName('NomsColonnesModeleurs'));
+    this.othersSlotsName = getFlatDisplayValues(activeSpreadsheet.getRangeByName('NomsColonnesAutres'));
 
     this.slotsNames = this.ceramistsSlotsName.concat(this.modelersSlotsName, this.othersSlotsName);
 
@@ -134,20 +119,28 @@ class GenerateParameters {
     this.weeksToDisplay = activeSpreadsheet.getRangeByName('SemainesAffichees').getValue();
 
     // -- People data
-    this.peopleNamesActiveRange = peopleActiveSheet.getRange(4, 1, peopleActiveSheet.getMaxRows());
+    this.peopleNamesActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS, 1, peopleActiveSheet.getMaxRows());
     this.peopleNames = getFlatDisplayValues(this.peopleNamesActiveRange);
 
-    this.ceramistsPastDaysActiveRange = peopleActiveSheet.getRange(4, 2, peopleActiveSheet.getMaxRows());
+    this.ceramistsPastDaysActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS, 2, peopleActiveSheet.getMaxRows());
     this.ceramistsPastDays = getValuesAsNumber(this.ceramistsPastDaysActiveRange);
 
-    this.ceramistsSelfPastDaysActiveRange = peopleActiveSheet.getRange(4, 6, peopleActiveSheet.getMaxRows());
+    this.ceramistsSelfPastDaysActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS, 6, peopleActiveSheet.getMaxRows());
     this.ceramistsSelfPastDays = getValuesAsNumber(this.ceramistsSelfPastDaysActiveRange);
 
-    this.modelersPastDaysActiveRange = peopleActiveSheet.getRange(4, 10, peopleActiveSheet.getMaxRows());
+    this.modelersPastDaysActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS, 10, peopleActiveSheet.getMaxRows());
     this.modelersPastDays = getValuesAsNumber(this.modelersPastDaysActiveRange);
 
-    this.modelersSelfPastDaysActiveRange = peopleActiveSheet.getRange(4, 14, peopleActiveSheet.getMaxRows());
+    this.modelersSelfPastDaysActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS, 14, peopleActiveSheet.getMaxRows());
     this.modelersSelfPastDays = getValuesAsNumber(this.modelersSelfPastDaysActiveRange);
+
+    this.ceramistsDaysToComeActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS, 3, peopleActiveSheet.getMaxRows());
+
+    this.ceramistsSelfDaysToComeActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS, 7, peopleActiveSheet.getMaxRows());
+
+    this.modelersDaysToComeActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS, 11, peopleActiveSheet.getMaxRows());
+
+    this.modelersSelfDaysToComeActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS, 15, peopleActiveSheet.getMaxRows());
 
     // -- Dropdown validation rules
     let peopleNamePublicRange = peoplePublicSheet.getRange(2, 1, peoplePublicSheet.getMaxRows());

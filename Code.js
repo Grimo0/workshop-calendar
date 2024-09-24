@@ -21,6 +21,8 @@ const TYPES_OF_PEOPLE = ['Tourneurs', 'Modeleurs'];
 
 const SELF_DAYS_HEADER = "Zone Libre";
 
+const PEOPLE_HEADER_NB_ROWS = 4;
+
 
 /**
  * Regenerate the calendar
@@ -250,9 +252,33 @@ function generateCalendar() {
     // -- Update people "days to come" formula
     if (true) {
       log(`Update people "days to come" formula.`);
-      // TODO Update people "days to come" formula in the active people sheet.
-      // Formula is =COUNTIF('Calendrier Céramistes'!$D:$E; $A4) but $D:$E needs
-      // to be changed depending on the category (ceramists/modelers) and $A4 should match the curent row.
+
+      let ceramistsDaysToCome = [];
+      let ceramistsSelfDaysToCome = [];
+      let modelersDaysToCome = [];
+      let modelersSelfDaysToCome = [];
+
+      let lastColName = columnToLetter(CALENDAR.SLOT + p.slotsNames.length);
+      let selectedCols = Array.from(Array(p.ceramistsSlotsName.length), (_, i) => i + CALENDAR.SLOT).join(";");
+      let filter = `FILTER(CHOOSECOLS('${CALENDAR_SHEET_NAME}'!$A:$${lastColName}; 1; ${selectedCols}); '${CALENDAR_SHEET_NAME}'!$A:$A = "${OPENING_TYPE.REGULAR}")`;
+      let filterSelf = `FILTER(CHOOSECOLS('${CALENDAR_SHEET_NAME}'!$A:$${lastColName}; 1; ${selectedCols}); '${CALENDAR_SHEET_NAME}'!$A:$A = "${OPENING_TYPE.SELF}")`;
+      for (let row = 0; row < p.ceramistsDaysToComeActiveRange.getNumRows(); row++) {
+        ceramistsDaysToCome.push([`=COUNTIF(${filter}; $A${PEOPLE_HEADER_NB_ROWS + row})`]);
+        ceramistsSelfDaysToCome.push([`=COUNTIF(${filterSelf}; $A${PEOPLE_HEADER_NB_ROWS + row})`]);
+      }
+
+      selectedCols = Array.from(Array(p.modelersSlotsName.length), (_, i) => i + CALENDAR.SLOT + p.ceramistsSlotsName.length).join(";");
+      filter = `FILTER(CHOOSECOLS('${CALENDAR_SHEET_NAME}'!$A:$${lastColName}; 1; ${selectedCols}); '${CALENDAR_SHEET_NAME}'!$A:$A = "${OPENING_TYPE.REGULAR}")`;
+      filterSelf = `FILTER(CHOOSECOLS('${CALENDAR_SHEET_NAME}'!$A:$${lastColName}; 1; ${selectedCols}); '${CALENDAR_SHEET_NAME}'!$A:$A = "${OPENING_TYPE.SELF}")`;
+      for (let row = 0; row < p.modelersDaysToComeActiveRange.getNumRows(); row++) {
+        modelersDaysToCome.push([`=COUNTIF(${filter}; $A${PEOPLE_HEADER_NB_ROWS + row})`]);
+        modelersSelfDaysToCome.push([`=COUNTIF(${filterSelf}; $A${PEOPLE_HEADER_NB_ROWS + row})`]);
+      }
+
+      p.ceramistsDaysToComeActiveRange.setValues(ceramistsDaysToCome);
+      p.ceramistsSelfDaysToComeActiveRange.setValues(ceramistsSelfDaysToCome);
+      p.modelersDaysToComeActiveRange.setValues(modelersDaysToCome);
+      p.modelersSelfDaysToComeActiveRange.setValues(modelersSelfDaysToCome);
     }
 
     // -- Update people past days counts
@@ -272,7 +298,6 @@ function generateCalendar() {
           }
         }
       }
-
 
       p.ceramistsPastDaysActiveRange.setValues(p.ceramistsPastDays);
       p.ceramistsSelfPastDaysActiveRange.setValues(p.ceramistsSelfPastDays);
@@ -348,7 +373,7 @@ function updatePeopleOnly() {
   let activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
 
   let peopleActiveSheet = activeSpreadsheet.getSheetByName(PEOPLE_SHEET_NAME);
-  let peopleNames = getFlatDisplayValues(peopleActiveSheet.getRange(4, 1, peopleActiveSheet.getMaxRows()));
+  let peopleNames = getFlatDisplayValues(peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS, 1, peopleActiveSheet.getMaxRows()));
 
   updatePeople(activeSpreadsheet, publicSpreadsheet, peopleNames);
 

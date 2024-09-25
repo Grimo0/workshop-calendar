@@ -83,7 +83,7 @@ function getDaysMap(values) {
     }
 
     if (isSelfDay) {
-      selfDaysMap.set([beginDate, endDate], row);
+      selfDaysMap.set([beginDate, endDate], row); // TODO Rather than the row, add a map with {slot: person} to avoid bugs when adding colons
     } else {
       daysMap.set([beginDate, endDate], row);
     }

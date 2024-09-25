@@ -68,7 +68,7 @@ function getDayIdx(s) {
 function updateDate(d, str) {
   let daySplit = str.split("/");
   if (daySplit.length > 2)
-    d.setFullYear(daySplit[2] < 2000 ? 2000 + parseInt(daySplit[2]) : daySplit[2], daySplit[1] - 1, daySplit[0]);
+    d.setFullYear(daySplit[2].length <= 2 ? 2000 + parseInt(daySplit[2]) : daySplit[2], daySplit[1] - 1, daySplit[0]);
   else if (daySplit.length > 1)
     d.setMonth(daySplit[1] - 1, daySplit[0]);
   else

@@ -50,7 +50,7 @@ function generateCalendar() {
   errorRange.setValue("MISE À JOUR EN COURS, ne PAS fermer la page");
 
   // -- Update people list
-  updatePeople(activeSpreadsheet, publicSpreadsheet, p.peopleNames);
+  updatePublicPeople(activeSpreadsheet, publicSpreadsheet, p.peopleNames);
 
   info("Mise à jour démarrée, ne pas fermer la page.");
 
@@ -363,7 +363,7 @@ function generateCalendar() {
 /**
  * Only update people without generating the calendar again.
  */
-function updatePeopleOnly() {
+function updatePublicPeopleOnly() {
   let publicSpreadsheet = SpreadsheetApp.openById(PUBLIC_CALENDAR_SHEET_ID);
   if (!publicSpreadsheet) {
     err(`Impossible d'ouvrir le calendrier public.`);
@@ -375,7 +375,7 @@ function updatePeopleOnly() {
   let peopleActiveSheet = activeSpreadsheet.getSheetByName(PEOPLE_SHEET_NAME);
   let peopleNames = getFlatDisplayValues(peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS, 1, peopleActiveSheet.getMaxRows()));
 
-  updatePeople(activeSpreadsheet, publicSpreadsheet, peopleNames);
+  updatePublicPeople(activeSpreadsheet, publicSpreadsheet, peopleNames);
 
   // -- Make sure all pending changes are applied
   SpreadsheetApp.flush();
@@ -390,7 +390,7 @@ function updatePeopleOnly() {
  * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} publicSpreadsheet
  * @param {String[]} peopleNames
  */
-function updatePeople(activeSpreadsheet, publicSpreadsheet, peopleNames) {
+function updatePublicPeople(activeSpreadsheet, publicSpreadsheet, peopleNames) {
   info("Mise à jour de la liste des inscrits.");
 
   let freeSlotCell = activeSpreadsheet.getRangeByName('EmplacementLibre').getCell(1, 1);
@@ -418,8 +418,26 @@ function updatePeople(activeSpreadsheet, publicSpreadsheet, peopleNames) {
     peoplePublicSheet.insertRows(peoplePublicSheet.getMaxRows(), publicValues.length - peoplePublicSheet.getMaxRows());
   }
 
+  // TODO Add colomns for Past/Future/Total/Inscrit and fill the past in the generate
+
   let publicRange = peoplePublicSheet.getRange(1, 1, publicValues.length)
     .setValues(publicValues);
+}
+
+/**
+ * Update people's data on the public spreadsheet using the active's one.
+ * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} activeSpreadsheet
+ * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} publicSpreadsheet
+ * @param {String[]} peopleNames
+ */
+function updatePeople(activeSpreadsheet, publicSpreadsheet, peopleNames) {
+  // TODO Recreate people list:
+  //  - auto categories based on named colomns categories, no more TYPES_OF_PEOPLE)
+  //  - One colomn for each OPENING_TYPE
+  //  - Past/Future/Total/Inscrit
+  //  - Update Future here, not in generate
+  // Line height 23
+  // Vertical middle
 }
 
 
@@ -528,7 +546,8 @@ function createOpeningRow(nbCols, openingTime, begin, end, p, savedMap = null) {
   newRow[CALENDAR.DAY] =
     openingTime.dayName
     + " " + begin.getDate()
-    + "/" + (begin.getMonth() + 1).toString().padStart(2, 0);
+    + "/" + (begin.getMonth() + 1).toString().padStart(2, 0)
+    + "/" + (begin.getFullYear() - 2000).toString();
 
   newRow[CALENDAR.HOUR] =
     begin.getHours() + (begin.getMinutes() > 0 ? "h" + begin.getMinutes() : "h")

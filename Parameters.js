@@ -105,20 +105,22 @@ class GenerateParameters {
     let peopleActiveSheet = activeSpreadsheet.getSheetByName(PEOPLE_SHEET_NAME);
     let parametersSheet = activeSpreadsheet.getSheetByName(PARAMETERS_SHEET_NAME);
 
-    // -- Get Slots name
-    let categoriesSheet = activeSpreadsheet.getSheetByName(CATEGORIES_SHEET_NAME);
-    this.ceramistsSlotsName = getFlatDisplayValues(categoriesSheet.getRange(2, 2, 1, categoriesSheet.getMaxColumns() - 1));
-    this.modelersSlotsName = getFlatDisplayValues(categoriesSheet.getRange(3, 2, 1, categoriesSheet.getMaxColumns() - 1));
-    this.othersSlotsName = getFlatDisplayValues(categoriesSheet.getRange(4, 2, 1, categoriesSheet.getMaxColumns() - 1));
-
-    this.slotsNames = this.ceramistsSlotsName.concat(this.modelersSlotsName, this.othersSlotsName);
-
     // -- Set the current date
     let daysToSkip = 7 - parametersSheet.getRange(2, 2).getValue();
     this.today = new Date();
     this.today.setDate(this.today.getDate() + (daysToSkip ? daysToSkip : 2));
 
     this.weeksToDisplay = parametersSheet.getRange(1, 2).getValue();
+
+    // -- Categories
+    let categoriesSheet = activeSpreadsheet.getSheetByName(CATEGORIES_SHEET_NAME);
+    let categoriesNames = getFlatDisplayValues(categoriesSheet.getRange(2, 1, categoriesSheet.getMaxRows() - 1, 1));
+    /** @type {Map<String, String[]>} */
+    this.categoriesSlots = new Map();
+    for (let i = 0; i < categoriesNames.length; i++) {
+      let slotsValues = getFlatDisplayValues(categoriesSheet.getRange(2 + i, 2, 1, categoriesSheet.getMaxColumns() - 1));
+      this.categoriesSlots.set(categoriesNames[i], slotsValues);
+    }
 
     // -- People data
     // Names
@@ -137,15 +139,6 @@ class GenerateParameters {
 
     this.modelersSelfPastDaysActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 14, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS);
     this.modelersSelfPastDays = getValuesAsNumber(this.modelersSelfPastDaysActiveRange);
-
-    // Future days
-    this.ceramistsFutureDaysActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 3, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS);
-
-    this.ceramistsSelfFutureDaysActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 7, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS);
-
-    this.modelersFutureDaysActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 11, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS);
-
-    this.modelersSelfFutureDaysActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 15, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS);
 
     // -- Dropdown validation rules
     let peopleNamePublicRange = peoplePublicSheet.getRange(2, 1, peoplePublicSheet.getMaxRows() - 1);
@@ -290,12 +283,12 @@ class GenerateParameters {
     let peopleNamesRows = this.peopleNamesActiveRange.getDisplayValues();
     for (let row = 0; row < peopleNamesRows.length; row++) {
       if (peopleNamesRows[row][0] == peopleName) {
-        if (slot < this.ceramistsSlotsName.length) {
+        if (slot < 3) { // TODO Change ceramists etc
           if (self)
             this.ceramistsSelfPastDays[row][0] += days;
           else
             this.ceramistsPastDays[row][0] += days;
-        } else if (slot < this.ceramistsSlotsName.length + this.modelersSlotsName.length) {
+        } else if (slot < 5) {
           if (self)
             this.modelersSelfPastDays[row][0] += days;
           else

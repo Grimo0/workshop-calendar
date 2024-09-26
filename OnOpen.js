@@ -7,8 +7,8 @@ function onOpen() {
   const menu = SpreadsheetApp.getUi().createMenu(APP_TITLE);
   menu
     .addItem('Regénérer calendrier', 'generateCalendar')
-    .addItem('Mettre à jour la liste des inscrits', 'updatePublicPeopleOnly')// TODO Add button to add an new person
-    .addToUi();
+    .addItem('Mettre à jour la liste des inscrits', 'updatePeopleOnly')
+    .addToUi();// TODO Add button to add an new person
 
   // Remove sheets with default name
   let activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();

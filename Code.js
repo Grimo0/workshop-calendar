@@ -22,10 +22,13 @@ const KEEP_CALENDAR_DATA = true;
 /** Should people past days counts be updated by adding the days removed and prior to today. */
 const UPDATE_PEOPLE_PAST_DAYS = true;
 
+const CATEGORY_PEOPLE_COLUMNS = ["Passé", "Futur", "Total", "Payé", "Passé", "Futur", "Total", "Payé"];
+
 const TYPES_OF_PEOPLE = ['Tourneurs', 'Modeleurs'];
 
 const SELF_DAYS_HEADER = "Zone Libre";
 
+const CALENDAR_HEADER_NB_ROWS = 2;
 const PEOPLE_HEADER_NB_ROWS = 3;
 
 
@@ -45,7 +48,6 @@ function generateCalendar() {
   let saveSheet = activeSpreadsheet.getSheetByName(SAVE_SHEET_NAME);
   let p = new GenerateParameters(activeSpreadsheet, publicSpreadsheet);
 
-  let startingWeekRow = 2;
   let weekCol = 1;
 
   // -- Set wip message
@@ -55,14 +57,15 @@ function generateCalendar() {
   errorRange.setValue("MISE À JOUR EN COURS, ne PAS fermer la page");
 
   // -- Update people list
+  updateActivePeople(activeSpreadsheet, p.categoriesNames);
   updatePublicPeople(activeSpreadsheet, publicSpreadsheet, p.peopleNames);
 
   info("Mise à jour démarrée, ne pas fermer la page.");
 
   // -- Copy people data from currently displayed weeks
   let calendarRange = calendarSheet.getRange(
-    startingWeekRow + 1, weekCol,
-    calendarSheet.getMaxRows() - startingWeekRow, calendarSheet.getMaxColumns() - weekCol + 1
+    CALENDAR_HEADER_NB_ROWS + 1, weekCol,
+    calendarSheet.getMaxRows() - CALENDAR_HEADER_NB_ROWS, calendarSheet.getMaxColumns() - weekCol + 1
   );
 
   let savedValues = calendarRange.getDisplayValues();
@@ -82,11 +85,7 @@ function generateCalendar() {
     log(`Generate saved values map`);
     let [savedDaysMap, savedSelfDaysMap] = getDaysMap(savedValues);
 
-    // -- Create header
-    const headerNumRows = addHeaderToCalendar(p, calendarSheet, startingWeekRow, weekCol);
-    log(`Added header.`);
-
-    let weekRow = startingWeekRow + headerNumRows;
+    let weekRow = CALENDAR_HEADER_NB_ROWS + 1;
 
     /** @type {GoogleAppsScript.Spreadsheet.Range[]} */
     let weeksSubheaderRanges = [];
@@ -240,6 +239,46 @@ function generateCalendar() {
 
     calendarSheet.setRowHeights(1, calendarSheet.getMaxRows(), 21);
 
+    let slotsNames = [];
+    for (let [category, slots] of p.categoriesSlots) {
+      for (let s of slots) {
+        slotsNames.push(s);
+      }
+    }
+
+    // -- Update the number of cols based on the nb of slots
+    if (calendarSheet.getMaxColumns() > CALENDAR.SLOT + slotsNames.length) {
+      calendarSheet.deleteColumns(
+        CALENDAR.SLOT + slotsNames.length,
+        calendarSheet.getMaxColumns() - (CALENDAR.SLOT + slotsNames.length)
+      );
+    } else if (calendarSheet.getMaxColumns() < CALENDAR.SLOT + slotsNames.length) {
+      calendarSheet.insertColumns(
+        calendarSheet.getMaxColumns(),
+        CALENDAR.SLOT + slotsNames.length - calendarSheet.getMaxColumns()
+      );
+    }
+    p.categoriesSlots.flat()
+
+    // -- Create header
+    log(`Add header.`);
+    let firstRange = calendarSheet.getRange(CALENDAR_HEADER_NB_ROWS, weekCol, 1, CALENDAR.SLOT)
+      .mergeAcross()
+      .setHorizontalAlignment("center")
+      .setVerticalAlignment("middle")
+      .setBackground(p.headerBackground)
+      .setBorder(true, true, true, true, false, false, p.borderColor, null);
+    weekCol += CALENDAR.SLOT
+
+    let slotsRange = calendarSheet.getRange(CALENDAR_HEADER_NB_ROWS, weekCol + CALENDAR.SLOT, 1, slotsNames.length)
+      .setTextStyle(p.headerTextStyle)
+      .setHorizontalAlignment("center")
+      .setVerticalAlignment("middle")
+      .setBackground(p.headerBackground)
+      .setBorder(true, true, true, true, true, false, p.borderColor, null)
+      .setValues([slotsNames])
+
+    // -- Weeks subheader and separators
     log(`Merge weeks subheader and separators.`);
     for (let weekSubheaderRange of weeksSubheaderRanges) {
       weekSubheaderRange.mergeAcross()
@@ -265,38 +304,6 @@ function generateCalendar() {
     calendarRange.setDataValidations(newDataValidations);
 
     log(`calendarRange filled.`);
-
-    // -- Update people future days formula
-    if (true) {
-      log(`Update people future days formula.`);
-
-      let ceramistsFutureDays = [];
-      let ceramistsSelfFutureDays = [];
-      let modelersFutureDays = [];
-      let modelersSelfFutureDays = [];
-
-      let lastColName = columnToLetter(CALENDAR.SLOT + p.slotsNames.length);
-      let selectedCols = Array.from(Array(p.ceramistsSlotsName.length), (_, i) => i + CALENDAR.SLOT).join(";");
-      let filter = `FILTER(CHOOSECOLS('${CALENDAR_SHEET_NAME}'!$A:$${lastColName}; 1; ${selectedCols}); '${CALENDAR_SHEET_NAME}'!$A:$A = "${OPENING_TYPE.REGULAR}")`;
-      let filterSelf = `FILTER(CHOOSECOLS('${CALENDAR_SHEET_NAME}'!$A:$${lastColName}; 1; ${selectedCols}); '${CALENDAR_SHEET_NAME}'!$A:$A = "${OPENING_TYPE.SELF}")`;
-      for (let row = 0; row < p.ceramistsFutureDaysActiveRange.getNumRows(); row++) {
-        ceramistsFutureDays.push([`=COUNTIF(${filter}; $A${PEOPLE_HEADER_NB_ROWS + row + 1})`]);
-        ceramistsSelfFutureDays.push([`=COUNTIF(${filterSelf}; $A${PEOPLE_HEADER_NB_ROWS + row + 1})`]);
-      }
-
-      selectedCols = Array.from(Array(p.modelersSlotsName.length), (_, i) => i + CALENDAR.SLOT + p.ceramistsSlotsName.length).join(";");
-      filter = `FILTER(CHOOSECOLS('${CALENDAR_SHEET_NAME}'!$A:$${lastColName}; 1; ${selectedCols}); '${CALENDAR_SHEET_NAME}'!$A:$A = "${OPENING_TYPE.REGULAR}")`;
-      filterSelf = `FILTER(CHOOSECOLS('${CALENDAR_SHEET_NAME}'!$A:$${lastColName}; 1; ${selectedCols}); '${CALENDAR_SHEET_NAME}'!$A:$A = "${OPENING_TYPE.SELF}")`;
-      for (let row = 0; row < p.modelersFutureDaysActiveRange.getNumRows(); row++) {
-        modelersFutureDays.push([`=COUNTIF(${filter}; $A${PEOPLE_HEADER_NB_ROWS + row + 1})`]);
-        modelersSelfFutureDays.push([`=COUNTIF(${filterSelf}; $A${PEOPLE_HEADER_NB_ROWS + row + 1})`]);
-      }
-
-      p.ceramistsFutureDaysActiveRange.setValues(ceramistsFutureDays);
-      p.ceramistsSelfFutureDaysActiveRange.setValues(ceramistsSelfFutureDays);
-      p.modelersFutureDaysActiveRange.setValues(modelersFutureDays);
-      p.modelersSelfFutureDaysActiveRange.setValues(modelersSelfFutureDays);
-    }
 
     // -- Update people past days counts
     if (UPDATE_PEOPLE_PAST_DAYS) {
@@ -333,22 +340,29 @@ function generateCalendar() {
   }
 
   // -- Set conditional format rules
+  let calendarSlotsRange = calendarSheet.getRange(
+    CALENDAR_HEADER_NB_ROWS + 1,
+    weekCol + CALENDAR.SLOT,
+    calendarRange.getNumRows() - CALENDAR_HEADER_NB_ROWS,
+    calendarSheet.getMaxColumns() - weekCol - CALENDAR.SLOT - 1);
+
   // Free slots
   let rules = [];
   let rule = SpreadsheetApp.newConditionalFormatRule()
     .whenTextEqualTo(p.freeSlotCell.getDisplayValue())
     .setFontColor(p.freeSlotCell.getFontColorObject().asRgbColor().asHexString())
     .setBackground(p.freeSlotCell.getBackground())
-    .setRanges([calendarSheet.getRange(startingWeekRow, weekCol + CALENDAR.SLOT, calendarRange.getNumRows() - startingWeekRow + 1, p.slotsNames.length)])
+    .setRanges([calendarSlotsRange])
     .build();
   rules.push(rule);
+
 
   // Unavailable slots
   rule = SpreadsheetApp.newConditionalFormatRule()
     .whenTextEqualTo(p.unavailableSlotCell.getDisplayValue())
     .setFontColor(p.unavailableSlotCell.getFontColorObject().asRgbColor().asHexString())
     .setBackground(p.unavailableSlotCell.getBackground())
-    .setRanges([calendarSheet.getRange(startingWeekRow, weekCol + CALENDAR.SLOT, calendarRange.getNumRows() - startingWeekRow + 1, p.slotsNames.length)])
+    .setRanges([calendarSlotsRange])
     .build();
   rules.push(rule);
 
@@ -362,7 +376,7 @@ function generateCalendar() {
       )`) // Check if column D > E or H > I
     .setFontColor("red")
     .setStrikethrough(true)
-    .setRanges([calendarSheet.getRange(startingWeekRow, weekCol + CALENDAR.SLOT, calendarRange.getNumRows() - startingWeekRow + 1, p.slotsNames.length)])
+    .setRanges([calendarSlotsRange])
     .build();
   rules.push(rule);
 
@@ -379,18 +393,31 @@ function generateCalendar() {
 /**
  * Only update people without generating the calendar again.
  */
-function updatePublicPeopleOnly() {
+function updatePeopleOnly() {
   let publicSpreadsheet = SpreadsheetApp.openById(PUBLIC_CALENDAR_SHEET_ID);
   if (!publicSpreadsheet) {
     err(`Impossible d'ouvrir le calendrier public.`);
     return;
   }
 
+  info("Mise à jour des tableaux d'inscrits.");
+
   let activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+
+  // Categories
+  let categoriesSheet = activeSpreadsheet.getSheetByName(CATEGORIES_SHEET_NAME);
+  let categoriesNames = getFlatDisplayValues(categoriesSheet.getRange(2, 1, categoriesSheet.getMaxRows() - 1, 1));
+  /** @type {Map<String, String[]>} */
+  let categoriesSlots = new Map();
+  for (let i = 0; i < categoriesNames.length; i++) {
+    let slotsValues = getFlatDisplayValues(categoriesSheet.getRange(2 + i, 2, 1, categoriesSheet.getMaxColumns() - 1));
+    categoriesSlots.set(categoriesNames[i], slotsValues);
+  }
 
   let peopleActiveSheet = activeSpreadsheet.getSheetByName(PEOPLE_SHEET_NAME);
   let peopleNames = getFlatDisplayValues(peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 1, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS));
 
+  updateActivePeople(activeSpreadsheet, categoriesSlots);
   updatePublicPeople(activeSpreadsheet, publicSpreadsheet, peopleNames);
 
   // -- Make sure all pending changes are applied
@@ -401,13 +428,149 @@ function updatePublicPeopleOnly() {
 
 
 /**
+ * Update people's formatting on the active spreadsheet.
+ * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} activeSpreadsheet
+ * @param {Map<String, String[]>} categoriesSlots
+ */
+function updateActivePeople(activeSpreadsheet, categoriesSlots) {
+  // TODO Recreate people list:
+  //  - auto categories based on named columns categories, no more TYPES_OF_PEOPLE)
+  //  - One column for each OPENING_TYPE
+  //  - Past/Future/Total/Paid
+  //  - Update Future here, not in generate
+  // Line height 23
+  // Vertical middle
+  log(`Update active people`);
+
+  let peopleActiveSheet = activeSpreadsheet.getSheetByName(PEOPLE_SHEET_NAME);
+
+  // Make sure we have enought columns or create the missing ones and init them
+  if (peopleActiveSheet.getMaxColumns() < 1 + 8 * categoriesSlots.size) {
+    let categoryStartCol = peopleActiveSheet.getMaxColumns() + 1;
+
+    peopleActiveSheet.insertColumnsAfter(peopleActiveSheet.getMaxColumns(), 1 + 8 * categoriesSlots.size - peopleActiveSheet.getMaxColumns());
+
+    // Past days
+    peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, categoryStartCol, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS)
+      .setValue(0);
+    peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, categoryStartCol + 4, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS)
+      .setValue(0);
+
+    // Total
+    let pastColName = columnToLetter(categoryStartCol);
+    let futureColName = columnToLetter(categoryStartCol + 1);
+    let totalRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, categoryStartCol + 2, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS);
+    let total = [];
+    for (let row = 0; row < totalRange.getNumRows(); row++) {
+      total.push([`=${pastColName}${PEOPLE_HEADER_NB_ROWS + row + 1} + ${futureColName}${PEOPLE_HEADER_NB_ROWS + row + 1}`]);
+    }
+    totalRange.setValues(total);
+
+    pastColName = columnToLetter(categoryStartCol + 4);
+    futureColName = columnToLetter(categoryStartCol + 5);
+    totalRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, categoryStartCol + 6, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS);
+    total = [];
+    for (let row = 0; row < totalRange.getNumRows(); row++) {
+      total.push([`=${pastColName}${PEOPLE_HEADER_NB_ROWS + row + 1} + ${futureColName}${PEOPLE_HEADER_NB_ROWS + row + 1}`]);
+    }
+    totalRange.setValues(total);
+
+    // Paid
+    peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, categoryStartCol + 3, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS)
+      .setValue(0);
+    peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, categoryStartCol + 7, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS)
+      .setValue(0);
+  }
+
+  let categoryStartCol = 2;
+  let calendarStartCol = CALENDAR.SLOT;
+
+  for (let [category, slots] of categoriesSlots) {
+    // - Header
+    peopleActiveSheet.getRange(1, categoryStartCol, 1, 8)
+      .mergeAcross()
+      .setValue(category)
+      .setFontSize(13);
+
+    peopleActiveSheet.getRange(2, categoryStartCol, 1, 4)
+      .mergeAcross()
+      .setValue(OPENING_TYPE.REGULAR)
+      .setFontSize(12);
+    peopleActiveSheet.getRange(2, categoryStartCol + 4, 1, 4)
+      .mergeAcross()
+      .setValue(OPENING_TYPE.SELF)
+      .setFontSize(12);
+
+    peopleActiveSheet.getRange(3, categoryStartCol, 1, 8)
+      .setValues([CATEGORY_PEOPLE_COLUMNS])
+      .setFontSize(12);
+
+    // - Future days formula
+    let futureDaysRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, categoryStartCol + 1, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS);
+    let futureDays = [];
+
+    let futureSelfDaysRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, categoryStartCol + 5, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS);
+    let futureSelfDays = [];
+
+    let lastColName = columnToLetter(calendarStartCol + slots.length);
+    let selectedCols = Array.from(Array(slots.length), (_, i) => i + calendarStartCol).join(";");
+    let filter = `FILTER(CHOOSECOLS('${CALENDAR_SHEET_NAME}'!$A:$${lastColName}; 1; ${selectedCols}); '${CALENDAR_SHEET_NAME}'!$A:$A = "${OPENING_TYPE.REGULAR}")`;
+    let filterSelf = `FILTER(CHOOSECOLS('${CALENDAR_SHEET_NAME}'!$A:$${lastColName}; 1; ${selectedCols}); '${CALENDAR_SHEET_NAME}'!$A:$A = "${OPENING_TYPE.SELF}")`;
+    for (let row = 0; row < futureDaysRange.getNumRows(); row++) {
+      futureDays.push([`=COUNTIF(${filter}; $A${PEOPLE_HEADER_NB_ROWS + row + 1})`]);
+      futureSelfDays.push([`=COUNTIF(${filterSelf}; $A${PEOPLE_HEADER_NB_ROWS + row + 1})`]);
+    }
+
+    futureDaysRange.setValues(futureDays);
+    futureSelfDaysRange.setValues(futureSelfDays);
+
+    // - Style
+
+    // Past days
+    peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, categoryStartCol, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS)
+      .setBackground("#efefef")
+      .setFontColor("#999999");
+    peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, categoryStartCol + 4, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS)
+      .setBackground("#efefef")
+      .setFontColor("#999999");
+
+    // Future days
+    peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, categoryStartCol + 1, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS)
+      .setBackground("#efefef")
+      .setFontColor("#999999");
+    peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, categoryStartCol + 5, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS)
+      .setBackground("#efefef")
+      .setFontColor("#999999");
+
+    // Total
+    peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, categoryStartCol + 2, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS)
+      .setBackground("#f3f3f3");
+
+    peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, categoryStartCol + 6, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS)
+      .setBackground("#f3f3f3");
+
+    // Borders
+    peopleActiveSheet.getRange(1, categoryStartCol, peopleActiveSheet.getMaxRows(), 8)
+      .setBorder(null, null, null, true, null, null, "#333333", SpreadsheetApp.BorderStyle.SOLID_MEDIUM)
+    peopleActiveSheet.getRange(1, categoryStartCol, peopleActiveSheet.getMaxRows(), 4)
+      .setBorder(null, null, null, true, null, null, "#888888", SpreadsheetApp.BorderStyle.SOLID);
+
+    calendarStartCol += slots.length;
+    categoryStartCol += 8;
+  }
+
+  peopleActiveSheet.setColumnWidths(2, peopleActiveSheet.getMaxColumns() - 1, 60);
+}
+
+
+/**
  * Update people's data on the public spreadsheet using the active's one.
  * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} activeSpreadsheet
  * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} publicSpreadsheet
  * @param {String[]} peopleNames
  */
 function updatePublicPeople(activeSpreadsheet, publicSpreadsheet, peopleNames) {
-  info("Mise à jour de la liste des inscrits.");
+  log("Update public people list");
 
   let parametersSheet = activeSpreadsheet.getSheetByName(PARAMETERS_SHEET_NAME);
   let freeSlotCell = parametersSheet.getRange(4, 2).getCell(1, 1);
@@ -436,74 +599,11 @@ function updatePublicPeople(activeSpreadsheet, publicSpreadsheet, peopleNames) {
     peoplePublicSheet.insertRows(peoplePublicSheet.getMaxRows(), publicValues.length - peoplePublicSheet.getMaxRows());
   }
 
-  // TODO Add columns for Past/Future/Total/Inscrit and fill the past in the generate
+  // TODO Add columns for Past/Future/Total/Paid and fill the past in the generate
 
   let publicRange = peoplePublicSheet.getRange(1, 1, publicValues.length)
     .setValues(publicValues)
     .setVerticalAlignment("middle");
-}
-
-/**
- * Update people's data on the public spreadsheet using the active's one.
- * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} activeSpreadsheet
- * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} publicSpreadsheet
- * @param {String[]} peopleNames
- */
-function updateActivePeople(activeSpreadsheet, publicSpreadsheet, peopleNames) {
-  // TODO Recreate people list:
-  //  - auto categories based on named columns categories, no more TYPES_OF_PEOPLE)
-  //  - One column for each OPENING_TYPE
-  //  - Past/Future/Total/Inscrit
-  //  - Update Future here, not in generate
-  // Line height 23
-  // Vertical middle
-
-  let peopleActiveSheet = activeSpreadsheet.getSheetByName(PEOPLE_SHEET_NAME);
-  let peoplePublicSheet = publicSpreadsheet.getSheetByName(PEOPLE_SHEET_NAME);
-}
-
-
-/**
- * Add the header to `calendarSheet`.
- * @param {GenerateParameters} p
- * @param {GoogleAppsScript.Spreadsheet.Sheet} calendarSheet
- * @param {number} weekRow
- * @param {number} weekCol
- * @returns {number} The number of rows created for the header
- */
-function addHeaderToCalendar(p, calendarSheet, weekRow, weekCol) {
-  // -- Update the number of cols based on the nb of slots
-  if (calendarSheet.getMaxColumns() > CALENDAR.SLOT + p.slotsNames.length) {
-    calendarSheet.deleteColumns(
-      CALENDAR.SLOT + p.slotsNames.length,
-      calendarSheet.getMaxColumns() - (CALENDAR.SLOT + p.slotsNames.length)
-    );
-  } else if (calendarSheet.getMaxColumns() < CALENDAR.SLOT + p.slotsNames.length) {
-    calendarSheet.insertColumns(
-      calendarSheet.getMaxColumns(),
-      CALENDAR.SLOT + p.slotsNames.length - calendarSheet.getMaxColumns()
-    );
-  }
-
-  // -- Merge first cells
-  let firstRange = calendarSheet.getRange(weekRow, weekCol, 1, CALENDAR.SLOT)
-    .mergeAcross()
-    .setHorizontalAlignment("center")
-    .setVerticalAlignment("middle")
-    .setBackground(p.headerBackground)
-    .setBorder(true, true, true, true, false, false, p.borderColor, null);
-  weekCol += CALENDAR.SLOT
-
-  // -- Set slots names
-  let slotsRange = calendarSheet.getRange(weekRow, weekCol, 1, p.slotsNames.length)
-    .setTextStyle(p.headerTextStyle)
-    .setHorizontalAlignment("center")
-    .setVerticalAlignment("middle")
-    .setBackground(p.headerBackground)
-    .setBorder(true, true, true, true, true, false, p.borderColor, null)
-    .setValues([p.slotsNames])
-
-  return 1;
 }
 
 
@@ -550,16 +650,13 @@ function createRowValues(nbCols, value = null, repeat = false) {
  * Create and return an initialized array for an opening row.
  * @param {number} nbCols
  * @param {OpeningTime} openingTime
- * @param {Date} begin
- * @param {Date} end
+ * @param {Date} begin The date corresponding to the beginning of this specific opening.
+ * @param {Date} end The date corresponding to the end of this specific opening.
  * @param {GenerateParameters} p
  * @param {Map<[Date, Date], Array<String>>} savedMap
  * @returns {String[]}
  */
 function createOpeningRow(nbCols, openingTime, begin, end, p, savedMap = null) {
-  if (nbCols < CALENDAR.SLOT + p.slotsNames.length)
-    throw new RangeError(`Trying to create an opening row with not enought cols (${nbCols} given while expecting at least ${CALENDAR.SLOT + p.slotsNames.length}).`);
-
   /** @type {String[]} */
   let newRow = Array(nbCols);
 
@@ -592,18 +689,18 @@ function createOpeningRow(nbCols, openingTime, begin, end, p, savedMap = null) {
       for (let i = CALENDAR.SLOT; i < savedRow.length; i++) {
         newRow[i] = formatName(savedRow[i]);
       }
-      for (let i = savedRow.length; i < p.slotsNames.length; i++) {
+      for (let i = savedRow.length; i < nbCols; i++) {
         newRow[i] = p.freeSlotCell.getDisplayValue();
       }
     }
     else {
-      for (let i = 0; i < p.slotsNames.length; i++) {
+      for (let i = 0; i < nbCols; i++) {
         newRow[CALENDAR.SLOT + i] = p.freeSlotCell.getDisplayValue();
       }
     }
   }
   else {
-    for (let i = 0; i < p.slotsNames.length; i++) {
+    for (let i = 0; i < nbCols; i++) {
       newRow[CALENDAR.SLOT + i] = p.freeSlotCell.getDisplayValue();
     }
   }

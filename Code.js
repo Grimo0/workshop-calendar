@@ -6,12 +6,13 @@
 
 const APP_TITLE = "Agenda Atelier Nuances";
 
+const PUBLIC_CALENDAR_SHEET_ID = "1_0Mh-E4UW4-eC-Y6oMr3VwMoKZSNE-i3woWh5OpXDmA";
+
 const CALENDAR_SHEET_NAME = "Calendrier Céramistes";
 const PEOPLE_SHEET_NAME = "Inscrits";
 const OPENINGS_SHEET_NAME = "Ouvertures";
+const CLOSED_SHEET_NAME = "Fermetures";
 const SAVE_SHEET_NAME = "SaveData";
-
-const PUBLIC_CALENDAR_SHEET_ID = "1_0Mh-E4UW4-eC-Y6oMr3VwMoKZSNE-i3woWh5OpXDmA";
 
 /** Should the data in the calendar be conserved. If false, it will be generated empty. */
 const KEEP_CALENDAR_DATA = true;

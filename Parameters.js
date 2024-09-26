@@ -201,7 +201,8 @@ class GenerateParameters {
     }
 
     // -- Closed times
-    let closedRange = activeSpreadsheet.getRangeByName('PeriodesFermeture');
+    let closedSheet = activeSpreadsheet.getSheetByName(CLOSED_SHEET_NAME);
+    let closedRange = closedSheet.getRange(3, 1, closedSheet.getMaxRows() - 2, 4);
     let closedValues = closedRange.getDisplayValues();
     /** @type {ClosedTime[]} */
     this.closedTimes = Array();

@@ -119,31 +119,34 @@ class GenerateParameters {
     this.weeksToDisplay = activeSpreadsheet.getRangeByName('SemainesAffichees').getValue();
 
     // -- People data
-    this.peopleNamesActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS, 1, peopleActiveSheet.getMaxRows());
+    // Names
+    this.peopleNamesActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 1, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS);
     this.peopleNames = getFlatDisplayValues(this.peopleNamesActiveRange);
 
-    this.ceramistsPastDaysActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS, 2, peopleActiveSheet.getMaxRows());
+    // Past days
+    this.ceramistsPastDaysActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 2, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS);
     this.ceramistsPastDays = getValuesAsNumber(this.ceramistsPastDaysActiveRange);
 
-    this.ceramistsSelfPastDaysActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS, 6, peopleActiveSheet.getMaxRows());
+    this.ceramistsSelfPastDaysActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 6, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS);
     this.ceramistsSelfPastDays = getValuesAsNumber(this.ceramistsSelfPastDaysActiveRange);
 
-    this.modelersPastDaysActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS, 10, peopleActiveSheet.getMaxRows());
+    this.modelersPastDaysActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 10, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS);
     this.modelersPastDays = getValuesAsNumber(this.modelersPastDaysActiveRange);
 
-    this.modelersSelfPastDaysActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS, 14, peopleActiveSheet.getMaxRows());
+    this.modelersSelfPastDaysActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 14, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS);
     this.modelersSelfPastDays = getValuesAsNumber(this.modelersSelfPastDaysActiveRange);
 
-    this.ceramistsDaysToComeActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS, 3, peopleActiveSheet.getMaxRows());
+    // Future days
+    this.ceramistsDaysToComeActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 3, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS);
 
-    this.ceramistsSelfDaysToComeActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS, 7, peopleActiveSheet.getMaxRows());
+    this.ceramistsSelfDaysToComeActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 7, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS);
 
-    this.modelersDaysToComeActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS, 11, peopleActiveSheet.getMaxRows());
+    this.modelersDaysToComeActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 11, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS);
 
-    this.modelersSelfDaysToComeActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS, 15, peopleActiveSheet.getMaxRows());
+    this.modelersSelfDaysToComeActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 15, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS);
 
     // -- Dropdown validation rules
-    let peopleNamePublicRange = peoplePublicSheet.getRange(2, 1, peoplePublicSheet.getMaxRows());
+    let peopleNamePublicRange = peoplePublicSheet.getRange(2, 1, peoplePublicSheet.getMaxRows() - 1);
     this.peopleRule = SpreadsheetApp.newDataValidation()
       .requireValueInRange(peopleNamePublicRange)
       .setAllowInvalid(false)
@@ -155,7 +158,8 @@ class GenerateParameters {
     this.emptySlotCell = activeSpreadsheet.getRangeByName('EmplacementVide').getCell(1, 1);
 
     // -- Opening times
-    let openingsRange = activeSpreadsheet.getRangeByName('PeriodesOuverture');
+    let openingsSheet = activeSpreadsheet.getSheetByName(OPENINGS_SHEET_NAME);
+    let openingsRange = openingsSheet.getRange(3, 1, openingsSheet.getMaxRows() - 2, 3);
     let openingsValues = openingsRange.getDisplayValues();
     /** @type {OpeningTime[]} */
     this.openingTimes = Array();
@@ -176,7 +180,7 @@ class GenerateParameters {
     }
 
     // -- Self-Opening times
-    let selfopeningsRange = activeSpreadsheet.getRangeByName('PeriodesOuvertureLibre');
+    let selfopeningsRange = openingsSheet.getRange(3, 4, openingsSheet.getMaxRows() - 2, 3);
     let selfopeningsValues = selfopeningsRange.getDisplayValues();
     /** @type {OpeningTime[]} */
     this.selfopeningTimes = Array();

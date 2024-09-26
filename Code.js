@@ -8,6 +8,7 @@ const APP_TITLE = "Agenda Atelier Nuances";
 
 const CALENDAR_SHEET_NAME = "Calendrier Céramistes";
 const PEOPLE_SHEET_NAME = "Inscrits";
+const OPENINGS_SHEET_NAME = "Ouvertures";
 const SAVE_SHEET_NAME = "SaveData";
 
 const PUBLIC_CALENDAR_SHEET_ID = "1_0Mh-E4UW4-eC-Y6oMr3VwMoKZSNE-i3woWh5OpXDmA";
@@ -21,7 +22,7 @@ const TYPES_OF_PEOPLE = ['Tourneurs', 'Modeleurs'];
 
 const SELF_DAYS_HEADER = "Zone Libre";
 
-const PEOPLE_HEADER_NB_ROWS = 4;
+const PEOPLE_HEADER_NB_ROWS = 3;
 
 
 /**
@@ -57,7 +58,7 @@ function generateCalendar() {
   // -- Copy people data from currently displayed weeks
   let calendarRange = calendarSheet.getRange(
     startingWeekRow + 1, weekCol,
-    calendarSheet.getMaxRows() - startingWeekRow + 1, calendarSheet.getMaxColumns() - weekCol + 1
+    calendarSheet.getMaxRows() - startingWeekRow, calendarSheet.getMaxColumns() - weekCol + 1
   );
 
   let savedValues = calendarRange.getDisplayValues();
@@ -263,16 +264,16 @@ function generateCalendar() {
       let filter = `FILTER(CHOOSECOLS('${CALENDAR_SHEET_NAME}'!$A:$${lastColName}; 1; ${selectedCols}); '${CALENDAR_SHEET_NAME}'!$A:$A = "${OPENING_TYPE.REGULAR}")`;
       let filterSelf = `FILTER(CHOOSECOLS('${CALENDAR_SHEET_NAME}'!$A:$${lastColName}; 1; ${selectedCols}); '${CALENDAR_SHEET_NAME}'!$A:$A = "${OPENING_TYPE.SELF}")`;
       for (let row = 0; row < p.ceramistsDaysToComeActiveRange.getNumRows(); row++) {
-        ceramistsDaysToCome.push([`=COUNTIF(${filter}; $A${PEOPLE_HEADER_NB_ROWS + row})`]);
-        ceramistsSelfDaysToCome.push([`=COUNTIF(${filterSelf}; $A${PEOPLE_HEADER_NB_ROWS + row})`]);
+        ceramistsDaysToCome.push([`=COUNTIF(${filter}; $A${PEOPLE_HEADER_NB_ROWS + row + 1})`]);
+        ceramistsSelfDaysToCome.push([`=COUNTIF(${filterSelf}; $A${PEOPLE_HEADER_NB_ROWS + row + 1})`]);
       }
 
       selectedCols = Array.from(Array(p.modelersSlotsName.length), (_, i) => i + CALENDAR.SLOT + p.ceramistsSlotsName.length).join(";");
       filter = `FILTER(CHOOSECOLS('${CALENDAR_SHEET_NAME}'!$A:$${lastColName}; 1; ${selectedCols}); '${CALENDAR_SHEET_NAME}'!$A:$A = "${OPENING_TYPE.REGULAR}")`;
       filterSelf = `FILTER(CHOOSECOLS('${CALENDAR_SHEET_NAME}'!$A:$${lastColName}; 1; ${selectedCols}); '${CALENDAR_SHEET_NAME}'!$A:$A = "${OPENING_TYPE.SELF}")`;
       for (let row = 0; row < p.modelersDaysToComeActiveRange.getNumRows(); row++) {
-        modelersDaysToCome.push([`=COUNTIF(${filter}; $A${PEOPLE_HEADER_NB_ROWS + row})`]);
-        modelersSelfDaysToCome.push([`=COUNTIF(${filterSelf}; $A${PEOPLE_HEADER_NB_ROWS + row})`]);
+        modelersDaysToCome.push([`=COUNTIF(${filter}; $A${PEOPLE_HEADER_NB_ROWS + row + 1})`]);
+        modelersSelfDaysToCome.push([`=COUNTIF(${filterSelf}; $A${PEOPLE_HEADER_NB_ROWS + row + 1})`]);
       }
 
       p.ceramistsDaysToComeActiveRange.setValues(ceramistsDaysToCome);
@@ -310,7 +311,6 @@ function generateCalendar() {
   } catch (e) {
     err(`Erreur pendant l'insertion des valeurs, sauvegarde restaurée.`, e);
     calendarRange.setValues(savedValues);
-    // saveRange.copyTo(calendarRange);
     errorRange.setValue(`Erreur prevenir Grégoire, ne rien toucher.`);
   }
 
@@ -323,7 +323,7 @@ function generateCalendar() {
     .whenTextEqualTo(p.freeSlotCell.getDisplayValue())
     .setFontColor(p.freeSlotCell.getFontColorObject().asRgbColor().asHexString())
     .setBackground(p.freeSlotCell.getBackground())
-    .setRanges([calendarSheet.getRange(startingWeekRow, weekCol + CALENDAR.SLOT, calendarRange.getNumRows(), p.slotsNames.length)])
+    .setRanges([calendarSheet.getRange(startingWeekRow, weekCol + CALENDAR.SLOT, calendarRange.getNumRows() - startingWeekRow + 1, p.slotsNames.length)])
     .build();
   rules.push(rule);
 
@@ -332,7 +332,7 @@ function generateCalendar() {
     .whenTextEqualTo(p.unavailableSlotCell.getDisplayValue())
     .setFontColor(p.unavailableSlotCell.getFontColorObject().asRgbColor().asHexString())
     .setBackground(p.unavailableSlotCell.getBackground())
-    .setRanges([calendarSheet.getRange(startingWeekRow, weekCol + CALENDAR.SLOT, calendarRange.getNumRows(), p.slotsNames.length)])
+    .setRanges([calendarSheet.getRange(startingWeekRow, weekCol + CALENDAR.SLOT, calendarRange.getNumRows() - startingWeekRow + 1, p.slotsNames.length)])
     .build();
   rules.push(rule);
 
@@ -346,7 +346,7 @@ function generateCalendar() {
       )`) // Check if column D > E or H > I
     .setFontColor("red")
     .setStrikethrough(true)
-    .setRanges([calendarSheet.getRange(startingWeekRow, weekCol + CALENDAR.SLOT, calendarRange.getNumRows(), p.slotsNames.length)])
+    .setRanges([calendarSheet.getRange(startingWeekRow, weekCol + CALENDAR.SLOT, calendarRange.getNumRows() - startingWeekRow + 1, p.slotsNames.length)])
     .build();
   rules.push(rule);
 
@@ -373,7 +373,7 @@ function updatePublicPeopleOnly() {
   let activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
 
   let peopleActiveSheet = activeSpreadsheet.getSheetByName(PEOPLE_SHEET_NAME);
-  let peopleNames = getFlatDisplayValues(peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS, 1, peopleActiveSheet.getMaxRows()));
+  let peopleNames = getFlatDisplayValues(peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 1, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS));
 
   updatePublicPeople(activeSpreadsheet, publicSpreadsheet, peopleNames);
 
@@ -411,6 +411,7 @@ function updatePublicPeople(activeSpreadsheet, publicSpreadsheet, peopleNames) {
 
   let peoplePublicSheet = publicSpreadsheet.getSheetByName(PEOPLE_SHEET_NAME);
   peoplePublicSheet.clearContents();
+  peoplePublicSheet.setRowHeights(2, peoplePublicSheet.getMaxRows() - 2, 23);
 
   // Add rows if there isn't enough
   if (publicValues.length > peoplePublicSheet.getMaxRows()) {
@@ -418,10 +419,11 @@ function updatePublicPeople(activeSpreadsheet, publicSpreadsheet, peopleNames) {
     peoplePublicSheet.insertRows(peoplePublicSheet.getMaxRows(), publicValues.length - peoplePublicSheet.getMaxRows());
   }
 
-  // TODO Add colomns for Past/Future/Total/Inscrit and fill the past in the generate
+  // TODO Add columns for Past/Future/Total/Inscrit and fill the past in the generate
 
   let publicRange = peoplePublicSheet.getRange(1, 1, publicValues.length)
-    .setValues(publicValues);
+    .setValues(publicValues)
+    .setVerticalAlignment("middle");
 }
 
 /**
@@ -430,14 +432,17 @@ function updatePublicPeople(activeSpreadsheet, publicSpreadsheet, peopleNames) {
  * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} publicSpreadsheet
  * @param {String[]} peopleNames
  */
-function updatePeople(activeSpreadsheet, publicSpreadsheet, peopleNames) {
+function updateActivePeople(activeSpreadsheet, publicSpreadsheet, peopleNames) {
   // TODO Recreate people list:
-  //  - auto categories based on named colomns categories, no more TYPES_OF_PEOPLE)
-  //  - One colomn for each OPENING_TYPE
+  //  - auto categories based on named columns categories, no more TYPES_OF_PEOPLE)
+  //  - One column for each OPENING_TYPE
   //  - Past/Future/Total/Inscrit
   //  - Update Future here, not in generate
   // Line height 23
   // Vertical middle
+
+  let peopleActiveSheet = activeSpreadsheet.getSheetByName(PEOPLE_SHEET_NAME);
+  let peoplePublicSheet = publicSpreadsheet.getSheetByName(PEOPLE_SHEET_NAME);
 }
 
 

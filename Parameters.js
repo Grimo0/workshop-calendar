@@ -139,13 +139,13 @@ class GenerateParameters {
     this.modelersSelfPastDays = getValuesAsNumber(this.modelersSelfPastDaysActiveRange);
 
     // Future days
-    this.ceramistsDaysToComeActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 3, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS);
+    this.ceramistsFutureDaysActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 3, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS);
 
-    this.ceramistsSelfDaysToComeActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 7, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS);
+    this.ceramistsSelfFutureDaysActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 7, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS);
 
-    this.modelersDaysToComeActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 11, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS);
+    this.modelersFutureDaysActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 11, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS);
 
-    this.modelersSelfDaysToComeActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 15, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS);
+    this.modelersSelfFutureDaysActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 15, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS);
 
     // -- Dropdown validation rules
     let peopleNamePublicRange = peoplePublicSheet.getRange(2, 1, peoplePublicSheet.getMaxRows() - 1);

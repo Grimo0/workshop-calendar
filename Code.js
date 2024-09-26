@@ -78,14 +78,6 @@ function generateCalendar() {
 
   // -- Try to update the sheet and if there is an issue, copy back the saved sheet
   try {
-    // -- Clear
-    calendarRange.clear()
-      .clearDataValidations()
-      .setNumberFormat("@");
-    log(`Cleared the public calendar.`);
-
-    calendarSheet.setRowHeights(1, calendarSheet.getMaxRows(), 21);
-
     // -- Generate saved values map
     log(`Generate saved values map`);
     let [savedDaysMap, savedSelfDaysMap] = getDaysMap(savedValues);
@@ -95,6 +87,11 @@ function generateCalendar() {
     log(`Added header.`);
 
     let weekRow = startingWeekRow + headerNumRows;
+
+    /** @type {GoogleAppsScript.Spreadsheet.Range[]} */
+    let weeksSubheaderRanges = [];
+    /** @type {GoogleAppsScript.Spreadsheet.Range[]} */
+    let weeksSeparatorRanges = [];
 
     /** @type {String[][]} */
     let newValues = [];
@@ -132,9 +129,7 @@ function generateCalendar() {
       newVerticalAlignments.push(createRowValues(nbCols, "middle"));
       newBackgrounds.push(createRowValues(nbCols, p.subheaderBackground));
       newDataValidations.push(createRowValues(nbCols));
-      let titleRange = calendarSheet.getRange(weekRow, weekCol, 1, nbCols)
-        .mergeAcross()
-        .setBorder(true, true, true, true, false, false, p.borderColor, null);
+      weeksSubheaderRanges.push(calendarSheet.getRange(weekRow, weekCol, 1, nbCols));
 
       weekRow += 1;
 
@@ -184,9 +179,7 @@ function generateCalendar() {
           newVerticalAlignments.push(createRowValues(nbCols, "middle"));
           newBackgrounds.push(createRowValues(nbCols, p.separatorBackground));
           newDataValidations.push(createRowValues(nbCols));
-          let separatorRange = calendarSheet.getRange(weekRow, weekCol, 1, nbCols)
-            .mergeAcross()
-            .setBorder(true, true, true, true, false, false, p.borderColor, null);
+          weeksSeparatorRanges.push(calendarSheet.getRange(weekRow, weekCol, 1, nbCols));
 
           weekRow += 1;
         }
@@ -239,6 +232,25 @@ function generateCalendar() {
       throw new RangeError(`Inconsitent number of rows given as newDataValidations (${newDataValidations.length} while expecting ${calendarRange.getNumRows()}).`);
     }
 
+    // -- Clear
+    calendarRange.clear()
+      .clearDataValidations()
+      .setNumberFormat("@");
+    log(`Cleared the public calendar.`);
+
+    calendarSheet.setRowHeights(1, calendarSheet.getMaxRows(), 21);
+
+    log(`Merge weeks subheader and separators.`);
+    for (let weekSubheaderRange of weeksSubheaderRanges) {
+      weekSubheaderRange.mergeAcross()
+        .setBorder(true, true, true, true, false, false, p.borderColor, null);
+    }
+    for (let weekSeparatorRange of weeksSeparatorRanges) {
+      weekSeparatorRange.mergeAcross()
+        .setBorder(true, true, true, true, false, false, p.borderColor, null);
+    }
+
+    // -- Set values
     log(`Setting calendarRange newValues.`);
     calendarRange.setValues(newValues);
     log(`Setting calendarRange newTextStyles.`);
@@ -254,36 +266,36 @@ function generateCalendar() {
 
     log(`calendarRange filled.`);
 
-    // -- Update people "days to come" formula
+    // -- Update people future days formula
     if (true) {
-      log(`Update people "days to come" formula.`);
+      log(`Update people future days formula.`);
 
-      let ceramistsDaysToCome = [];
-      let ceramistsSelfDaysToCome = [];
-      let modelersDaysToCome = [];
-      let modelersSelfDaysToCome = [];
+      let ceramistsFutureDays = [];
+      let ceramistsSelfFutureDays = [];
+      let modelersFutureDays = [];
+      let modelersSelfFutureDays = [];
 
       let lastColName = columnToLetter(CALENDAR.SLOT + p.slotsNames.length);
       let selectedCols = Array.from(Array(p.ceramistsSlotsName.length), (_, i) => i + CALENDAR.SLOT).join(";");
       let filter = `FILTER(CHOOSECOLS('${CALENDAR_SHEET_NAME}'!$A:$${lastColName}; 1; ${selectedCols}); '${CALENDAR_SHEET_NAME}'!$A:$A = "${OPENING_TYPE.REGULAR}")`;
       let filterSelf = `FILTER(CHOOSECOLS('${CALENDAR_SHEET_NAME}'!$A:$${lastColName}; 1; ${selectedCols}); '${CALENDAR_SHEET_NAME}'!$A:$A = "${OPENING_TYPE.SELF}")`;
-      for (let row = 0; row < p.ceramistsDaysToComeActiveRange.getNumRows(); row++) {
-        ceramistsDaysToCome.push([`=COUNTIF(${filter}; $A${PEOPLE_HEADER_NB_ROWS + row + 1})`]);
-        ceramistsSelfDaysToCome.push([`=COUNTIF(${filterSelf}; $A${PEOPLE_HEADER_NB_ROWS + row + 1})`]);
+      for (let row = 0; row < p.ceramistsFutureDaysActiveRange.getNumRows(); row++) {
+        ceramistsFutureDays.push([`=COUNTIF(${filter}; $A${PEOPLE_HEADER_NB_ROWS + row + 1})`]);
+        ceramistsSelfFutureDays.push([`=COUNTIF(${filterSelf}; $A${PEOPLE_HEADER_NB_ROWS + row + 1})`]);
       }
 
       selectedCols = Array.from(Array(p.modelersSlotsName.length), (_, i) => i + CALENDAR.SLOT + p.ceramistsSlotsName.length).join(";");
       filter = `FILTER(CHOOSECOLS('${CALENDAR_SHEET_NAME}'!$A:$${lastColName}; 1; ${selectedCols}); '${CALENDAR_SHEET_NAME}'!$A:$A = "${OPENING_TYPE.REGULAR}")`;
       filterSelf = `FILTER(CHOOSECOLS('${CALENDAR_SHEET_NAME}'!$A:$${lastColName}; 1; ${selectedCols}); '${CALENDAR_SHEET_NAME}'!$A:$A = "${OPENING_TYPE.SELF}")`;
-      for (let row = 0; row < p.modelersDaysToComeActiveRange.getNumRows(); row++) {
-        modelersDaysToCome.push([`=COUNTIF(${filter}; $A${PEOPLE_HEADER_NB_ROWS + row + 1})`]);
-        modelersSelfDaysToCome.push([`=COUNTIF(${filterSelf}; $A${PEOPLE_HEADER_NB_ROWS + row + 1})`]);
+      for (let row = 0; row < p.modelersFutureDaysActiveRange.getNumRows(); row++) {
+        modelersFutureDays.push([`=COUNTIF(${filter}; $A${PEOPLE_HEADER_NB_ROWS + row + 1})`]);
+        modelersSelfFutureDays.push([`=COUNTIF(${filterSelf}; $A${PEOPLE_HEADER_NB_ROWS + row + 1})`]);
       }
 
-      p.ceramistsDaysToComeActiveRange.setValues(ceramistsDaysToCome);
-      p.ceramistsSelfDaysToComeActiveRange.setValues(ceramistsSelfDaysToCome);
-      p.modelersDaysToComeActiveRange.setValues(modelersDaysToCome);
-      p.modelersSelfDaysToComeActiveRange.setValues(modelersSelfDaysToCome);
+      p.ceramistsFutureDaysActiveRange.setValues(ceramistsFutureDays);
+      p.ceramistsSelfFutureDaysActiveRange.setValues(ceramistsSelfFutureDays);
+      p.modelersFutureDaysActiveRange.setValues(modelersFutureDays);
+      p.modelersSelfFutureDaysActiveRange.setValues(modelersSelfFutureDays);
     }
 
     // -- Update people past days counts

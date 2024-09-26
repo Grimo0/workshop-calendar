@@ -9,9 +9,12 @@ const APP_TITLE = "Agenda Atelier Nuances";
 const PUBLIC_CALENDAR_SHEET_ID = "1_0Mh-E4UW4-eC-Y6oMr3VwMoKZSNE-i3woWh5OpXDmA";
 
 const CALENDAR_SHEET_NAME = "Calendrier Céramistes";
+const HOMEPAGE_SHEET_NAME = "INFOS";
 const PEOPLE_SHEET_NAME = "Inscrits";
 const OPENINGS_SHEET_NAME = "Ouvertures";
 const CLOSED_SHEET_NAME = "Fermetures";
+const CATEGORIES_SHEET_NAME = "Catégories";
+const PARAMETERS_SHEET_NAME = "Paramètres";
 const SAVE_SHEET_NAME = "SaveData";
 
 /** Should the data in the calendar be conserved. If false, it will be generated empty. */
@@ -48,7 +51,7 @@ function generateCalendar() {
   // -- Set wip message
   let messageRange = calendarSheet.getRange("F1");
   messageRange.setValue("MISE À JOUR EN COURS, PATIENTEZ");
-  let errorRange = activeSpreadsheet.getRangeByName("Erreurs");
+  let errorRange = activeSpreadsheet.getSheetByName(HOMEPAGE_SHEET_NAME).getRange(3, 2);
   errorRange.setValue("MISE À JOUR EN COURS, ne PAS fermer la page");
 
   // -- Update people list
@@ -215,7 +218,7 @@ function generateCalendar() {
       newDataValidations.push(Array(nbCols));
     }
 
-    log(`Completed with ${calendarRange.getNumRows() - (weekRow - calendarRange.getRow())} empty rows for a total of ${calendarRange.getNumRows()}.`);
+    log(`Completed with ${calendarRange.getNumRows() - (weekRow - calendarRange.getRow())} empty rows for a total of ${calendarRange.getNumRows()} rows.`);
 
     if (newValues.length != calendarRange.getNumRows()) {
       throw new RangeError(`Inconsitent number of rows given as newValues (${newValues.length} while expecting ${calendarRange.getNumRows()}).`);
@@ -309,13 +312,13 @@ function generateCalendar() {
     }
 
     errorRange.clearContent();
+    messageRange.clearContent();
   } catch (e) {
     err(`Erreur pendant l'insertion des valeurs, sauvegarde restaurée.`, e);
     calendarRange.setValues(savedValues);
     errorRange.setValue(`Erreur prevenir Grégoire, ne rien toucher.`);
+    messageRange.setValue(`Erreur prevenir Grégoire ou Karo, ne rien toucher.`);
   }
-
-  messageRange.clearContent();
 
   // -- Set conditional format rules
   // Free slots
@@ -394,8 +397,9 @@ function updatePublicPeopleOnly() {
 function updatePublicPeople(activeSpreadsheet, publicSpreadsheet, peopleNames) {
   info("Mise à jour de la liste des inscrits.");
 
-  let freeSlotCell = activeSpreadsheet.getRangeByName('EmplacementLibre').getCell(1, 1);
-  let unavailableSlotCell = activeSpreadsheet.getRangeByName('EmplacementIndisponible').getCell(1, 1);
+  let parametersSheet = activeSpreadsheet.getSheetByName(PARAMETERS_SHEET_NAME);
+  let freeSlotCell = parametersSheet.getRange(4, 2).getCell(1, 1);
+  let unavailableSlotCell = parametersSheet.getRange(5, 2).getCell(1, 1);
 
   /** @type {string[][]} */
   let publicValues = Array();

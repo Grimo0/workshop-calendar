@@ -103,20 +103,22 @@ class GenerateParameters {
 
     let peoplePublicSheet = publicSpreadsheet.getSheetByName(PEOPLE_SHEET_NAME);
     let peopleActiveSheet = activeSpreadsheet.getSheetByName(PEOPLE_SHEET_NAME);
+    let parametersSheet = activeSpreadsheet.getSheetByName(PARAMETERS_SHEET_NAME);
 
     // -- Get Slots name
-    this.ceramistsSlotsName = getFlatDisplayValues(activeSpreadsheet.getRangeByName('NomsColonnesTourneurs'));
-    this.modelersSlotsName = getFlatDisplayValues(activeSpreadsheet.getRangeByName('NomsColonnesModeleurs'));
-    this.othersSlotsName = getFlatDisplayValues(activeSpreadsheet.getRangeByName('NomsColonnesAutres'));
+    let categoriesSheet = activeSpreadsheet.getSheetByName(CATEGORIES_SHEET_NAME);
+    this.ceramistsSlotsName = getFlatDisplayValues(categoriesSheet.getRange(2, 2, 1, categoriesSheet.getMaxColumns() - 1));
+    this.modelersSlotsName = getFlatDisplayValues(categoriesSheet.getRange(3, 2, 1, categoriesSheet.getMaxColumns() - 1));
+    this.othersSlotsName = getFlatDisplayValues(categoriesSheet.getRange(4, 2, 1, categoriesSheet.getMaxColumns() - 1));
 
     this.slotsNames = this.ceramistsSlotsName.concat(this.modelersSlotsName, this.othersSlotsName);
 
     // -- Set the current date
-    let daysToSkip = 7 - activeSpreadsheet.getRangeByName('JourFinDeSemaine').getValue();
+    let daysToSkip = 7 - parametersSheet.getRange(2, 2).getValue();
     this.today = new Date();
     this.today.setDate(this.today.getDate() + (daysToSkip ? daysToSkip : 2));
 
-    this.weeksToDisplay = activeSpreadsheet.getRangeByName('SemainesAffichees').getValue();
+    this.weeksToDisplay = parametersSheet.getRange(1, 2).getValue();
 
     // -- People data
     // Names
@@ -153,9 +155,9 @@ class GenerateParameters {
       .build();
 
     // -- Special cells
-    this.freeSlotCell = activeSpreadsheet.getRangeByName('EmplacementLibre').getCell(1, 1);
-    this.unavailableSlotCell = activeSpreadsheet.getRangeByName('EmplacementIndisponible').getCell(1, 1);
-    this.emptySlotCell = activeSpreadsheet.getRangeByName('EmplacementVide').getCell(1, 1);
+    this.freeSlotCell = parametersSheet.getRange(4, 2).getCell(1, 1);
+    this.unavailableSlotCell = parametersSheet.getRange(5, 2).getCell(1, 1);
+    this.emptySlotCell = parametersSheet.getRange(6, 2).getCell(1, 1);
 
     // -- Opening times
     let openingsSheet = activeSpreadsheet.getSheetByName(OPENINGS_SHEET_NAME);

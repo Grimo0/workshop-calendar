@@ -444,7 +444,11 @@ function updatePeopleOnly() {
  * @param {Map<String, String[]>} categoriesSlots
  */
 function updateActivePeople(peopleActiveSheet, categoriesSlots) {
-  log(`Update active people`);
+  info(`Update active people`);
+
+  // TODO Remove lines with an empty name
+
+  // TODO Remove columns of the categories that don't exist anymore
 
   // Make sure we have enought columns or create the missing ones and init them
   if (peopleActiveSheet.getMaxColumns() < 1 + 8 * categoriesSlots.size) {
@@ -577,7 +581,7 @@ function updateActivePeople(peopleActiveSheet, categoriesSlots) {
 
     // Borders
     peopleActiveSheet.getRange(1, categoryStartCol, peopleActiveSheet.getMaxRows(), 8)
-      .setBorder(null, null, null, true, null, null, "#333333", SpreadsheetApp.BorderStyle.SOLID_MEDIUM)
+      .setBorder(null, null, null, true, null, null, "#333333", SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
     peopleActiveSheet.getRange(1, categoryStartCol, peopleActiveSheet.getMaxRows(), 4)
       .setBorder(null, null, null, true, null, null, "#888888", SpreadsheetApp.BorderStyle.SOLID);
 
@@ -605,25 +609,24 @@ function updateActivePeople(peopleActiveSheet, categoriesSlots) {
  * @param {GoogleAppsScript.Spreadsheet.Sheet} parametersSheet
  */
 function updatePublicPeopleNames(peopleActiveSheet, peoplePublicSheet, parametersSheet) {
-  log("Update public people name");
-
-  let peopleActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 1, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS);
+  info("Update public people name");
 
   // Add rows if there isn't enough
-  let maxRows = PEOPLE_HEADER_NB_ROWS + peopleActiveRange.getNumRows() + 2;
+  let maxRows = peopleActiveSheet.getMaxRows() + 2;
   if (maxRows > peoplePublicSheet.getMaxRows()) {
     log(`Adding ${maxRows - peoplePublicSheet.getMaxRows()} rows to the public people sheets.`)
-    peoplePublicSheet.insertRows(peoplePublicSheet.getMaxRows(), maxRows - peoplePublicSheet.getMaxRows());
+    peoplePublicSheet.insertRowsAfter(peoplePublicSheet.getMaxRows(), maxRows - peoplePublicSheet.getMaxRows());
   } else if (maxRows < peoplePublicSheet.getMaxRows()) {
     log(`Removing ${peoplePublicSheet.getMaxRows() - maxRows} rows from the public people sheets.`)
     peoplePublicSheet.deleteRows(maxRows, peoplePublicSheet.getMaxRows() - maxRows);
   }
 
   // -- Names
+  let peopleActiveValues = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 1, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS).getDisplayValues();
   let freeSlotCell = parametersSheet.getRange(4, 2).getCell(1, 1);
   let unavailableSlotCell = parametersSheet.getRange(5, 2).getCell(1, 1);
   let peopleValues = Array([freeSlotCell.getDisplayValue()], [unavailableSlotCell.getDisplayValue()]);
-  for (let row of peopleActiveRange.getDisplayValues()) {
+  for (let row of peopleActiveValues) {
     peopleValues.push([formatName(row[0])]);
   }
 
@@ -639,7 +642,9 @@ function updatePublicPeopleNames(peopleActiveSheet, peoplePublicSheet, parameter
  * @param {Map<String, String[]>} categoriesSlots
  */
 function updatePublicPeopleCategories(peopleActiveSheet, peoplePublicSheet, categoriesSlots) {
-  log("Update public people list");
+  info("Update public people list");
+
+  // TODO Remove columns of the categories that don't exist anymore
 
   // Make sure we have enought columns or create the missing ones and init them
   if (peoplePublicSheet.getMaxColumns() < 1 + 4 * categoriesSlots.size) {
@@ -709,9 +714,9 @@ function updatePublicPeopleCategories(peopleActiveSheet, peoplePublicSheet, cate
     // - Style
 
     // Total
-    let totalRange = peoplePublicSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, categoryStartCol, peoplePublicSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS)
+    let totalRange = peoplePublicSheet.getRange(PEOPLE_HEADER_NB_ROWS + 3, categoryStartCol, peoplePublicSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS - 2)
       .setBackground("#f3f3f3");
-    let totalSelfRange = peoplePublicSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, categoryStartCol + 2, peoplePublicSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS)
+    let totalSelfRange = peoplePublicSheet.getRange(PEOPLE_HEADER_NB_ROWS + 3, categoryStartCol + 2, peoplePublicSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS - 2)
       .setBackground("#f3f3f3");
 
     let totalLetter = columnToLetter(categoryStartCol);
@@ -736,7 +741,7 @@ function updatePublicPeopleCategories(peopleActiveSheet, peoplePublicSheet, cate
 
     // Borders
     peoplePublicSheet.getRange(1, categoryStartCol, peoplePublicSheet.getMaxRows(), 4)
-      .setBorder(null, null, null, true, null, null, "#333333", SpreadsheetApp.BorderStyle.SOLID_MEDIUM)
+      .setBorder(null, null, null, true, null, null, "#333333", SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
     peoplePublicSheet.getRange(1, categoryStartCol, peoplePublicSheet.getMaxRows(), 2)
       .setBorder(null, null, null, true, null, null, "#888888", SpreadsheetApp.BorderStyle.SOLID);
 
@@ -755,6 +760,80 @@ function updatePublicPeopleCategories(peopleActiveSheet, peoplePublicSheet, cate
     .setVerticalAlignment("middle");
   peoplePublicSheet.setColumnWidths(2, peoplePublicSheet.getMaxColumns() - 1, 60);
   peoplePublicSheet.setRowHeights(1, peoplePublicSheet.getMaxRows(), 23);
+}
+
+
+function addOnePerson() {
+  let publicSpreadsheet = SpreadsheetApp.openById(PUBLIC_CALENDAR_SHEET_ID);
+  if (!publicSpreadsheet) {
+    err(`Impossible d'ouvrir le calendrier public.`);
+    return;
+  }
+  log(`Adding one person`);
+
+  var ui = SpreadsheetApp.getUi();
+  var result = ui.prompt(
+    "Nom du nouvel inscrit:",
+    ui.ButtonSet.OK_CANCEL,
+  );
+
+  var button = result.getSelectedButton();
+  if (button == ui.Button.OK) {
+  } else if (button == ui.Button.CANCEL) {
+    log(`Canceled`);
+    return;
+  } else if (button == ui.Button.CLOSE) {
+    log(`Closed`);
+    return;
+  }
+
+  var name = result.getResponseText();
+
+  let activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+
+  let peopleActiveSheet = activeSpreadsheet.getSheetByName(PEOPLE_SHEET_NAME);
+  let peoplePublicSheet = publicSpreadsheet.getSheetByName(PEOPLE_SHEET_NAME);
+  let parametersSheet = activeSpreadsheet.getSheetByName(PARAMETERS_SHEET_NAME);
+
+  // Add the line and fill the name
+  peopleActiveSheet.insertRowAfter(peopleActiveSheet.getMaxRows());
+  let newPersonRange = peopleActiveSheet.getRange(peopleActiveSheet.getMaxRows(), 1, 1, peopleActiveSheet.getMaxColumns());
+  let newPersonRow = [name];
+  for (let i = 1; i < peopleActiveSheet.getMaxColumns(); i += 4) {
+    // Past
+    newPersonRow.push(0);
+
+    // Future (initialized in `updateActivePeople`)
+    newPersonRow.push(0);
+
+    // Total
+    let pastColName = columnToLetter(i + 1);
+    let futureColName = columnToLetter(i + 2);
+    newPersonRow.push(`=${pastColName}${peopleActiveSheet.getMaxRows()} + ${futureColName}${peopleActiveSheet.getMaxRows()}`);
+
+    // Paid
+    newPersonRow.push(0);
+  }
+  newPersonRange.setValues([newPersonRow]);
+
+  // Categories
+  let categoriesSheet = activeSpreadsheet.getSheetByName(CATEGORIES_SHEET_NAME);
+  let categoriesNames = getFlatDisplayValues(categoriesSheet.getRange(2, 1, categoriesSheet.getMaxRows() - 1, 1));
+  /** @type {Map<String, String[]>} */
+  let categoriesSlots = new Map();
+  for (let i = 0; i < categoriesNames.length; i++) {
+    let slotsValues = getFlatDisplayValues(categoriesSheet.getRange(2 + i, 2, 1, categoriesSheet.getMaxColumns() - 1));
+    categoriesSlots.set(categoriesNames[i], slotsValues);
+  }
+
+  updateActivePeople(peopleActiveSheet, categoriesSlots);
+  updatePublicPeopleNames(peopleActiveSheet, peoplePublicSheet, parametersSheet);
+  updatePublicPeopleCategories(peopleActiveSheet, peoplePublicSheet, categoriesSlots);
+
+  // -- Make sure all pending changes are applied
+  SpreadsheetApp.flush();
+
+  info(`${name} a bien été ajouté !`);
 }
 
 

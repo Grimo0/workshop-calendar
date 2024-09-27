@@ -1,7 +1,6 @@
 /**
- * This App Script update the calendar sheet with the planning tables for the current week and the following ones.
- * On a new week, it removes the past one and adds a empty new one at the end.
- * Named ranges are used to parameter all.
+ * This App Script update the public calendar spreadsheet with the planning tables for the current week and the following ones.
+ * On a new week, it removes the past one.
  */
 
 const APP_TITLE = "Agenda Atelier Nuances";
@@ -55,12 +54,31 @@ function generateCalendar() {
   let errorRange = activeSpreadsheet.getSheetByName(HOMEPAGE_SHEET_NAME).getRange(3, 2);
   errorRange.setValue("MISE À JOUR EN COURS, ne PAS fermer la page");
 
-  // -- Update people list
+  // -- Update people public list
   let peopleActiveSheet = activeSpreadsheet.getSheetByName(PEOPLE_SHEET_NAME);
   let peoplePublicSheet = publicSpreadsheet.getSheetByName(PEOPLE_SHEET_NAME);
   let parametersSheet = activeSpreadsheet.getSheetByName(PARAMETERS_SHEET_NAME);
-  updateActivePeople(peopleActiveSheet, p.categoriesSlots);
-  updatePublicPeople(peopleActiveSheet, peoplePublicSheet, parametersSheet, p.categoriesSlots);
+  updatePublicPeopleNames(peopleActiveSheet, peoplePublicSheet, parametersSheet);
+
+  // -- Update the number of cols based on the nb of slots
+  let slotsNames = [];
+  for (let [category, slots] of p.categoriesSlots) {
+    for (let s of slots) {
+      slotsNames.push(s);
+    }
+  }
+
+  if (calendarSheet.getMaxColumns() > CALENDAR.SLOT + slotsNames.length) {
+    calendarSheet.deleteColumns(
+      CALENDAR.SLOT + slotsNames.length,
+      calendarSheet.getMaxColumns() - (CALENDAR.SLOT + slotsNames.length)
+    );
+  } else if (calendarSheet.getMaxColumns() < CALENDAR.SLOT + slotsNames.length) {
+    calendarSheet.insertColumns(
+      calendarSheet.getMaxColumns(),
+      CALENDAR.SLOT + slotsNames.length - calendarSheet.getMaxColumns()
+    );
+  }
 
   info("Mise à jour démarrée, ne pas fermer la page.");
 
@@ -249,26 +267,6 @@ function generateCalendar() {
 
     calendarSheet.setRowHeights(1, calendarSheet.getMaxRows(), 21);
 
-    let slotsNames = [];
-    for (let [category, slots] of p.categoriesSlots) {
-      for (let s of slots) {
-        slotsNames.push(s);
-      }
-    }
-
-    // -- Update the number of cols based on the nb of slots
-    if (calendarSheet.getMaxColumns() > CALENDAR.SLOT + slotsNames.length) {
-      calendarSheet.deleteColumns(
-        CALENDAR.SLOT + slotsNames.length,
-        calendarSheet.getMaxColumns() - (CALENDAR.SLOT + slotsNames.length)
-      );
-    } else if (calendarSheet.getMaxColumns() < CALENDAR.SLOT + slotsNames.length) {
-      calendarSheet.insertColumns(
-        calendarSheet.getMaxColumns(),
-        CALENDAR.SLOT + slotsNames.length - calendarSheet.getMaxColumns()
-      );
-    }
-
     // -- Create header
     log(`Add header.`);
     let firstRange = calendarSheet.getRange(CALENDAR_HEADER_NB_ROWS, weekCol, 1, CALENDAR.SLOT)
@@ -390,6 +388,10 @@ function generateCalendar() {
   calendarSheet.setConditionalFormatRules(rules);
   log(`Conditional formal rules updated.`);
 
+  // -- Update people list
+  updateActivePeople(peopleActiveSheet, p.categoriesSlots);
+  updatePublicPeopleCategories(peopleActiveSheet, peoplePublicSheet, p.categoriesSlots);
+
   // -- Make sure all pending changes are applied
   SpreadsheetApp.flush();
 
@@ -426,7 +428,8 @@ function updatePeopleOnly() {
   let parametersSheet = activeSpreadsheet.getSheetByName(PARAMETERS_SHEET_NAME);
 
   updateActivePeople(peopleActiveSheet, categoriesSlots);
-  updatePublicPeople(peopleActiveSheet, peoplePublicSheet, parametersSheet, categoriesSlots);
+  updatePublicPeopleNames(peopleActiveSheet, peoplePublicSheet, parametersSheet);
+  updatePublicPeopleCategories(peopleActiveSheet, peoplePublicSheet, categoriesSlots);
 
   // -- Make sure all pending changes are applied
   SpreadsheetApp.flush();
@@ -600,10 +603,9 @@ function updateActivePeople(peopleActiveSheet, categoriesSlots) {
  * @param {GoogleAppsScript.Spreadsheet.Sheet} peopleActiveSheet
  * @param {GoogleAppsScript.Spreadsheet.Sheet} peoplePublicSheet
  * @param {GoogleAppsScript.Spreadsheet.Sheet} parametersSheet
- * @param {Map<String, String[]>} categoriesSlots
  */
-function updatePublicPeople(peopleActiveSheet, peoplePublicSheet, parametersSheet, categoriesSlots) {
-  log("Update public people list");
+function updatePublicPeopleNames(peopleActiveSheet, peoplePublicSheet, parametersSheet) {
+  log("Update public people name");
 
   let peopleActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 1, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS);
 
@@ -617,11 +619,6 @@ function updatePublicPeople(peopleActiveSheet, peoplePublicSheet, parametersShee
     peoplePublicSheet.deleteRows(maxRows, peoplePublicSheet.getMaxRows() - maxRows);
   }
 
-  // Make sure we have enought columns or create the missing ones and init them
-  if (peoplePublicSheet.getMaxColumns() < 1 + 4 * categoriesSlots.size) {
-    peoplePublicSheet.insertColumnsAfter(peoplePublicSheet.getMaxColumns(), 1 + 4 * categoriesSlots.size - peoplePublicSheet.getMaxColumns());
-  }
-
   // -- Names
   let freeSlotCell = parametersSheet.getRange(4, 2).getCell(1, 1);
   let unavailableSlotCell = parametersSheet.getRange(5, 2).getCell(1, 1);
@@ -632,6 +629,22 @@ function updatePublicPeople(peopleActiveSheet, peoplePublicSheet, parametersShee
 
   peoplePublicSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 1, peopleValues.length)
     .setValues(peopleValues);
+}
+
+
+/**
+ * Update people's data on the public spreadsheet using the active's one.
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} peopleActiveSheet
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} peoplePublicSheet
+ * @param {Map<String, String[]>} categoriesSlots
+ */
+function updatePublicPeopleCategories(peopleActiveSheet, peoplePublicSheet, categoriesSlots) {
+  log("Update public people list");
+
+  // Make sure we have enought columns or create the missing ones and init them
+  if (peoplePublicSheet.getMaxColumns() < 1 + 4 * categoriesSlots.size) {
+    peoplePublicSheet.insertColumnsAfter(peoplePublicSheet.getMaxColumns(), 1 + 4 * categoriesSlots.size - peoplePublicSheet.getMaxColumns());
+  }
 
   // -- Categories
   let categoryStartCol = 2;
@@ -826,6 +839,8 @@ function createOpeningRow(nbCols, openingTime, begin, end, p, savedMap = null) {
     if (savedRow) {
       for (let i = CALENDAR.SLOT; i < savedRow.length; i++) {
         newRow[i] = formatName(savedRow[i]);
+        if (newRow[i] == "")
+          newRow[i] = p.freeSlotCell.getDisplayValue();
       }
       for (let i = savedRow.length; i < nbCols; i++) {
         newRow[i] = p.freeSlotCell.getDisplayValue();

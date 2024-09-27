@@ -101,7 +101,6 @@ class GenerateParameters {
    */
   constructor(activeSpreadsheet, publicSpreadsheet) {
 
-    let peoplePublicSheet = publicSpreadsheet.getSheetByName(PEOPLE_SHEET_NAME);
     let peopleActiveSheet = activeSpreadsheet.getSheetByName(PEOPLE_SHEET_NAME);
     let parametersSheet = activeSpreadsheet.getSheetByName(PARAMETERS_SHEET_NAME);
 
@@ -114,12 +113,11 @@ class GenerateParameters {
 
     // -- Categories
     let categoriesSheet = activeSpreadsheet.getSheetByName(CATEGORIES_SHEET_NAME);
-    let categoriesNames = getFlatDisplayValues(categoriesSheet.getRange(2, 1, categoriesSheet.getMaxRows() - 1, 1));
     /** @type {Map<String, String[]>} */
     this.categoriesSlots = new Map();
-    for (let i = 0; i < categoriesNames.length; i++) {
-      let slotsValues = getFlatDisplayValues(categoriesSheet.getRange(2 + i, 2, 1, categoriesSheet.getMaxColumns() - 1));
-      this.categoriesSlots.set(categoriesNames[i], slotsValues);
+    for (let i = 1; i < categoriesSheet.getMaxRows(); i++) {
+      let slotsValues = getFlatDisplayValues(categoriesSheet.getRange(1 + i, 1, 1, categoriesSheet.getMaxColumns()));
+      this.categoriesSlots.set(slotsValues.shift(), slotsValues);
     }
 
     // -- People data
@@ -139,13 +137,6 @@ class GenerateParameters {
 
     this.modelersSelfPastDaysActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 14, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS);
     this.modelersSelfPastDays = getValuesAsNumber(this.modelersSelfPastDaysActiveRange);
-
-    // -- Dropdown validation rules
-    let peopleNamePublicRange = peoplePublicSheet.getRange(2, 1, peoplePublicSheet.getMaxRows() - 1);
-    this.peopleRule = SpreadsheetApp.newDataValidation()
-      .requireValueInRange(peopleNamePublicRange)
-      .setAllowInvalid(false)
-      .build();
 
     // -- Special cells
     this.freeSlotCell = parametersSheet.getRange(4, 2).getCell(1, 1);

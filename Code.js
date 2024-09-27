@@ -23,8 +23,7 @@ const KEEP_CALENDAR_DATA = true;
 const UPDATE_PEOPLE_PAST_DAYS = true;
 
 const CATEGORY_PEOPLE_COLUMNS = ["Passé", "Futur", "Total", "Payé", "Passé", "Futur", "Total", "Payé"];
-
-const TYPES_OF_PEOPLE = ['Tourneurs', 'Modeleurs'];
+const PUBLIC_CATEGORY_PEOPLE_COLUMNS = ["Total", "Payé", "Total", "Payé"];
 
 const SELF_DAYS_HEADER = "Zone Libre";
 
@@ -57,8 +56,11 @@ function generateCalendar() {
   errorRange.setValue("MISE À JOUR EN COURS, ne PAS fermer la page");
 
   // -- Update people list
-  updateActivePeople(activeSpreadsheet, p.categoriesNames);
-  updatePublicPeople(activeSpreadsheet, publicSpreadsheet, p.peopleNames);
+  let peopleActiveSheet = activeSpreadsheet.getSheetByName(PEOPLE_SHEET_NAME);
+  let peoplePublicSheet = publicSpreadsheet.getSheetByName(PEOPLE_SHEET_NAME);
+  let parametersSheet = activeSpreadsheet.getSheetByName(PARAMETERS_SHEET_NAME);
+  updateActivePeople(peopleActiveSheet, p.categoriesSlots);
+  updatePublicPeople(peopleActiveSheet, peoplePublicSheet, parametersSheet, p.categoriesSlots);
 
   info("Mise à jour démarrée, ne pas fermer la page.");
 
@@ -86,6 +88,14 @@ function generateCalendar() {
     let [savedDaysMap, savedSelfDaysMap] = getDaysMap(savedValues);
 
     let weekRow = CALENDAR_HEADER_NB_ROWS + 1;
+
+    // Dropdown validation rules
+    let peoplePublicSheet = publicSpreadsheet.getSheetByName(PEOPLE_SHEET_NAME);
+    let peopleNamePublicRange = peoplePublicSheet.getRange(2, 1, peoplePublicSheet.getMaxRows() - 1);
+    let peopleRule = SpreadsheetApp.newDataValidation()
+      .requireValueInRange(peopleNamePublicRange)
+      .setAllowInvalid(false)
+      .build();
 
     /** @type {GoogleAppsScript.Spreadsheet.Range[]} */
     let weeksSubheaderRanges = [];
@@ -151,7 +161,7 @@ function generateCalendar() {
         newHorizontalAlignments.push(createRowValues(nbCols, [null, "center", "center"]));
         newVerticalAlignments.push(createRowValues(nbCols, "middle", true));
         newBackgrounds.push(createRowValues(nbCols, [null, openingTime.dayColor, openingTime.hourColor]));
-        newDataValidations.push(createRowValues(nbCols, [null, null, null, p.peopleRule], true));
+        newDataValidations.push(createRowValues(nbCols, [null, null, null, peopleRule], true));
 
         weekRow += 1;
       }
@@ -191,7 +201,7 @@ function generateCalendar() {
         newHorizontalAlignments.push(createRowValues(nbCols, [null, "center", "center"]));
         newVerticalAlignments.push(createRowValues(nbCols, "middle", true));
         newBackgrounds.push(createRowValues(nbCols, [null, openingTime.dayColor, openingTime.hourColor]));
-        newDataValidations.push(createRowValues(nbCols, [null, null, null, p.peopleRule], true));
+        newDataValidations.push(createRowValues(nbCols, [null, null, null, peopleRule], true));
 
         weekRow += 1;
       }
@@ -258,7 +268,6 @@ function generateCalendar() {
         CALENDAR.SLOT + slotsNames.length - calendarSheet.getMaxColumns()
       );
     }
-    p.categoriesSlots.flat()
 
     // -- Create header
     log(`Add header.`);
@@ -268,7 +277,6 @@ function generateCalendar() {
       .setVerticalAlignment("middle")
       .setBackground(p.headerBackground)
       .setBorder(true, true, true, true, false, false, p.borderColor, null);
-    weekCol += CALENDAR.SLOT
 
     let slotsRange = calendarSheet.getRange(CALENDAR_HEADER_NB_ROWS, weekCol + CALENDAR.SLOT, 1, slotsNames.length)
       .setTextStyle(p.headerTextStyle)
@@ -305,7 +313,7 @@ function generateCalendar() {
 
     log(`calendarRange filled.`);
 
-    // -- Update people past days counts
+    // -- Update people past days counts (last so we don't count them if something went bad)
     if (UPDATE_PEOPLE_PAST_DAYS) {
       log(`Incrementing people past days.`);
       for (const [[b, e], r] of savedDaysMap) {
@@ -344,7 +352,7 @@ function generateCalendar() {
     CALENDAR_HEADER_NB_ROWS + 1,
     weekCol + CALENDAR.SLOT,
     calendarRange.getNumRows() - CALENDAR_HEADER_NB_ROWS,
-    calendarSheet.getMaxColumns() - weekCol - CALENDAR.SLOT - 1);
+    calendarSheet.getMaxColumns() - weekCol - CALENDAR.SLOT + 1);
 
   // Free slots
   let rules = [];
@@ -355,7 +363,6 @@ function generateCalendar() {
     .setRanges([calendarSlotsRange])
     .build();
   rules.push(rule);
-
 
   // Unavailable slots
   rule = SpreadsheetApp.newConditionalFormatRule()
@@ -415,10 +422,11 @@ function updatePeopleOnly() {
   }
 
   let peopleActiveSheet = activeSpreadsheet.getSheetByName(PEOPLE_SHEET_NAME);
-  let peopleNames = getFlatDisplayValues(peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 1, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS));
+  let peoplePublicSheet = publicSpreadsheet.getSheetByName(PEOPLE_SHEET_NAME);
+  let parametersSheet = activeSpreadsheet.getSheetByName(PARAMETERS_SHEET_NAME);
 
-  updateActivePeople(activeSpreadsheet, categoriesSlots);
-  updatePublicPeople(activeSpreadsheet, publicSpreadsheet, peopleNames);
+  updateActivePeople(peopleActiveSheet, categoriesSlots);
+  updatePublicPeople(peopleActiveSheet, peoplePublicSheet, parametersSheet, categoriesSlots);
 
   // -- Make sure all pending changes are applied
   SpreadsheetApp.flush();
@@ -429,20 +437,11 @@ function updatePeopleOnly() {
 
 /**
  * Update people's formatting on the active spreadsheet.
- * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} activeSpreadsheet
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} peopleActiveSheet
  * @param {Map<String, String[]>} categoriesSlots
  */
-function updateActivePeople(activeSpreadsheet, categoriesSlots) {
-  // TODO Recreate people list:
-  //  - auto categories based on named columns categories, no more TYPES_OF_PEOPLE)
-  //  - One column for each OPENING_TYPE
-  //  - Past/Future/Total/Paid
-  //  - Update Future here, not in generate
-  // Line height 23
-  // Vertical middle
+function updateActivePeople(peopleActiveSheet, categoriesSlots) {
   log(`Update active people`);
-
-  let peopleActiveSheet = activeSpreadsheet.getSheetByName(PEOPLE_SHEET_NAME);
 
   // Make sure we have enought columns or create the missing ones and init them
   if (peopleActiveSheet.getMaxColumns() < 1 + 8 * categoriesSlots.size) {
@@ -484,26 +483,31 @@ function updateActivePeople(activeSpreadsheet, categoriesSlots) {
 
   let categoryStartCol = 2;
   let calendarStartCol = CALENDAR.SLOT;
+  let rules = [];
 
   for (let [category, slots] of categoriesSlots) {
     // - Header
     peopleActiveSheet.getRange(1, categoryStartCol, 1, 8)
       .mergeAcross()
       .setValue(category)
-      .setFontSize(13);
+      .setFontSize(13)
+      .setBackground("#6aa84f");
 
     peopleActiveSheet.getRange(2, categoryStartCol, 1, 4)
       .mergeAcross()
       .setValue(OPENING_TYPE.REGULAR)
-      .setFontSize(12);
+      .setFontSize(12)
+      .setBackground("#93c47d");
     peopleActiveSheet.getRange(2, categoryStartCol + 4, 1, 4)
       .mergeAcross()
       .setValue(OPENING_TYPE.SELF)
-      .setFontSize(12);
+      .setFontSize(12)
+      .setBackground("#93c47d");
 
     peopleActiveSheet.getRange(3, categoryStartCol, 1, 8)
       .setValues([CATEGORY_PEOPLE_COLUMNS])
-      .setFontSize(12);
+      .setFontSize(12)
+      .setBackground("#b6d7a8");
 
     // - Future days formula
     let futureDaysRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, categoryStartCol + 1, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS);
@@ -543,11 +547,30 @@ function updateActivePeople(activeSpreadsheet, categoriesSlots) {
       .setFontColor("#999999");
 
     // Total
-    peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, categoryStartCol + 2, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS)
+    let totalRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, categoryStartCol + 2, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS)
+      .setBackground("#f3f3f3");
+    let totalSelfRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, categoryStartCol + 6, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS)
       .setBackground("#f3f3f3");
 
-    peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, categoryStartCol + 6, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS)
-      .setBackground("#f3f3f3");
+    let totalLetter = columnToLetter(categoryStartCol + 2);
+    let paidLetter = columnToLetter(categoryStartCol + 3);
+    let rule = SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied(`=AND(${paidLetter}${PEOPLE_HEADER_NB_ROWS + 1}<>""; ${totalLetter}${PEOPLE_HEADER_NB_ROWS + 1} > ${paidLetter}${PEOPLE_HEADER_NB_ROWS + 1})`)
+      .setFontColor("#ffffff")
+      .setBackground("#cc0000")
+      .setRanges([totalRange])
+      .build();
+    rules.push(rule);
+
+    let totalSelfLetter = columnToLetter(categoryStartCol + 6);
+    let paidSelfLetter = columnToLetter(categoryStartCol + 7);
+    rule = SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied(`=AND(${paidSelfLetter}${PEOPLE_HEADER_NB_ROWS + 1}<>""; ${totalSelfLetter}${PEOPLE_HEADER_NB_ROWS + 1} > ${paidSelfLetter}${PEOPLE_HEADER_NB_ROWS + 1})`)
+      .setFontColor("#ffffff")
+      .setBackground("#cc0000")
+      .setRanges([totalSelfRange])
+      .build();
+    rules.push(rule);
 
     // Borders
     peopleActiveSheet.getRange(1, categoryStartCol, peopleActiveSheet.getMaxRows(), 8)
@@ -559,51 +582,166 @@ function updateActivePeople(activeSpreadsheet, categoriesSlots) {
     categoryStartCol += 8;
   }
 
+  peopleActiveSheet.setConditionalFormatRules(rules);
+
+  // - Style
+  peopleActiveSheet.getRange(1, 1, PEOPLE_HEADER_NB_ROWS, peopleActiveSheet.getMaxColumns())
+    .setHorizontalAlignment("center")
+    .setFontWeight("bold");
+  peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 1, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS, peopleActiveSheet.getMaxColumns())
+    .setVerticalAlignment("middle");
   peopleActiveSheet.setColumnWidths(2, peopleActiveSheet.getMaxColumns() - 1, 60);
+  peopleActiveSheet.setRowHeights(1, peopleActiveSheet.getMaxRows(), 23);
 }
 
 
 /**
  * Update people's data on the public spreadsheet using the active's one.
- * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} activeSpreadsheet
- * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} publicSpreadsheet
- * @param {String[]} peopleNames
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} peopleActiveSheet
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} peoplePublicSheet
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} parametersSheet
+ * @param {Map<String, String[]>} categoriesSlots
  */
-function updatePublicPeople(activeSpreadsheet, publicSpreadsheet, peopleNames) {
+function updatePublicPeople(peopleActiveSheet, peoplePublicSheet, parametersSheet, categoriesSlots) {
   log("Update public people list");
 
-  let parametersSheet = activeSpreadsheet.getSheetByName(PARAMETERS_SHEET_NAME);
-  let freeSlotCell = parametersSheet.getRange(4, 2).getCell(1, 1);
-  let unavailableSlotCell = parametersSheet.getRange(5, 2).getCell(1, 1);
-
-  /** @type {string[][]} */
-  let publicValues = Array();
-  publicValues.push(["Noms"]);
-
-  publicValues.push([freeSlotCell.getDisplayValue()]);
-
-  publicValues.push([unavailableSlotCell.getDisplayValue()]);
-
-  // Get people's names
-  for (let name of peopleNames) {
-    publicValues.push([formatName(name)]);
-  }
-
-  let peoplePublicSheet = publicSpreadsheet.getSheetByName(PEOPLE_SHEET_NAME);
-  peoplePublicSheet.clearContents();
-  peoplePublicSheet.setRowHeights(2, peoplePublicSheet.getMaxRows() - 2, 23);
+  let peopleActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 1, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS);
 
   // Add rows if there isn't enough
-  if (publicValues.length > peoplePublicSheet.getMaxRows()) {
-    log(`Adding ${publicValues.length - peoplePublicSheet.getMaxRows()} rows to the public people sheets.`)
-    peoplePublicSheet.insertRows(peoplePublicSheet.getMaxRows(), publicValues.length - peoplePublicSheet.getMaxRows());
+  let maxRows = PEOPLE_HEADER_NB_ROWS + peopleActiveRange.getNumRows() + 2;
+  if (maxRows > peoplePublicSheet.getMaxRows()) {
+    log(`Adding ${maxRows - peoplePublicSheet.getMaxRows()} rows to the public people sheets.`)
+    peoplePublicSheet.insertRows(peoplePublicSheet.getMaxRows(), maxRows - peoplePublicSheet.getMaxRows());
+  } else if (maxRows < peoplePublicSheet.getMaxRows()) {
+    log(`Removing ${peoplePublicSheet.getMaxRows() - maxRows} rows from the public people sheets.`)
+    peoplePublicSheet.deleteRows(maxRows, peoplePublicSheet.getMaxRows() - maxRows);
   }
 
-  // TODO Add columns for Past/Future/Total/Paid and fill the past in the generate
+  // Make sure we have enought columns or create the missing ones and init them
+  if (peoplePublicSheet.getMaxColumns() < 1 + 4 * categoriesSlots.size) {
+    peoplePublicSheet.insertColumnsAfter(peoplePublicSheet.getMaxColumns(), 1 + 4 * categoriesSlots.size - peoplePublicSheet.getMaxColumns());
+  }
 
-  let publicRange = peoplePublicSheet.getRange(1, 1, publicValues.length)
-    .setValues(publicValues)
+  // -- Names
+  let freeSlotCell = parametersSheet.getRange(4, 2).getCell(1, 1);
+  let unavailableSlotCell = parametersSheet.getRange(5, 2).getCell(1, 1);
+  let peopleValues = Array([freeSlotCell.getDisplayValue()], [unavailableSlotCell.getDisplayValue()]);
+  for (let row of peopleActiveRange.getDisplayValues()) {
+    peopleValues.push([formatName(row[0])]);
+  }
+
+  peoplePublicSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 1, peopleValues.length)
+    .setValues(peopleValues);
+
+  // -- Categories
+  let categoryStartCol = 2;
+  let categoryActiveStartCol = 2;
+  let calendarStartCol = CALENDAR.SLOT;
+  let rules = [];
+
+  for (let [category, slots] of categoriesSlots) {
+    // - Header
+    peoplePublicSheet.getRange(1, categoryStartCol, 1, 4)
+      .mergeAcross()
+      .setValue(category)
+      .setFontSize(13)
+      .setBackground("#6aa84f");
+
+    peoplePublicSheet.getRange(2, categoryStartCol, 1, 2)
+      .mergeAcross()
+      .setValue(OPENING_TYPE.REGULAR)
+      .setFontSize(12)
+      .setBackground("#93c47d");
+    peoplePublicSheet.getRange(2, categoryStartCol + 2, 1, 2)
+      .mergeAcross()
+      .setValue(OPENING_TYPE.SELF)
+      .setFontSize(12)
+      .setBackground("#93c47d");
+
+    peoplePublicSheet.getRange(3, categoryStartCol, 1, 4)
+      .setValues([PUBLIC_CATEGORY_PEOPLE_COLUMNS])
+      .setFontSize(12)
+      .setBackground("#b6d7a8");
+
+    // - Future days formula (skip free and unavailable)
+    let pastActiveValues = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, categoryActiveStartCol, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS).getDisplayValues();
+    let futureDaysRange = peoplePublicSheet.getRange(PEOPLE_HEADER_NB_ROWS + 3, categoryStartCol, peoplePublicSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS - 2);
+    let futureDays = [];
+
+    let pastSelfActiveValues = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, categoryActiveStartCol + 4, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS).getDisplayValues();
+    let futureSelfDaysRange = peoplePublicSheet.getRange(PEOPLE_HEADER_NB_ROWS + 3, categoryStartCol + 2, peoplePublicSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS - 2);
+    let futureSelfDays = [];
+
+    let lastColName = columnToLetter(calendarStartCol + slots.length);
+    let selectedCols = Array.from(Array(slots.length), (_, i) => i + calendarStartCol).join(";");
+    let filter = `FILTER(CHOOSECOLS('${CALENDAR_SHEET_NAME}'!$A:$${lastColName}; 1; ${selectedCols}); '${CALENDAR_SHEET_NAME}'!$A:$A = "${OPENING_TYPE.REGULAR}")`;
+    let filterSelf = `FILTER(CHOOSECOLS('${CALENDAR_SHEET_NAME}'!$A:$${lastColName}; 1; ${selectedCols}); '${CALENDAR_SHEET_NAME}'!$A:$A = "${OPENING_TYPE.SELF}")`;
+    for (let row = 0; row < futureDaysRange.getNumRows(); row++) {
+      futureDays.push([`=${pastActiveValues[row]} + COUNTIF(${filter}; $A${PEOPLE_HEADER_NB_ROWS + 3 + row})`]);
+      futureSelfDays.push([`=${pastSelfActiveValues[row]} + COUNTIF(${filterSelf}; $A${PEOPLE_HEADER_NB_ROWS + 3 + row})`]);
+    }
+
+    futureDaysRange.setValues(futureDays);
+    futureSelfDaysRange.setValues(futureSelfDays);
+
+    // - Copy paid
+    let paidActiveValues = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, categoryActiveStartCol + 3, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS).getDisplayValues();
+    peoplePublicSheet.getRange(PEOPLE_HEADER_NB_ROWS + 3, categoryStartCol + 1, peoplePublicSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS - 2)
+      .setValues(paidActiveValues);
+
+    let selfpaidActiveValues = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, categoryActiveStartCol + 7, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS).getDisplayValues();
+    peoplePublicSheet.getRange(PEOPLE_HEADER_NB_ROWS + 3, categoryStartCol + 3, peoplePublicSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS - 2)
+      .setValues(selfpaidActiveValues);
+
+    // - Style
+
+    // Total
+    let totalRange = peoplePublicSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, categoryStartCol, peoplePublicSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS)
+      .setBackground("#f3f3f3");
+    let totalSelfRange = peoplePublicSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, categoryStartCol + 2, peoplePublicSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS)
+      .setBackground("#f3f3f3");
+
+    let totalLetter = columnToLetter(categoryStartCol);
+    let paidLetter = columnToLetter(categoryStartCol + 1);
+    let rule = SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied(`=AND(${paidLetter}${PEOPLE_HEADER_NB_ROWS + 1}<>""; ${totalLetter}${PEOPLE_HEADER_NB_ROWS + 1} > ${paidLetter}${PEOPLE_HEADER_NB_ROWS + 1})`)
+      .setFontColor("#ffffff")
+      .setBackground("#cc0000")
+      .setRanges([totalRange])
+      .build();
+    rules.push(rule);
+
+    let totalSelfLetter = columnToLetter(categoryStartCol + 2);
+    let paidSelfLetter = columnToLetter(categoryStartCol + 3);
+    rule = SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied(`=AND(${paidSelfLetter}${PEOPLE_HEADER_NB_ROWS + 1}<>""; ${totalSelfLetter}${PEOPLE_HEADER_NB_ROWS + 1} > ${paidSelfLetter}${PEOPLE_HEADER_NB_ROWS + 1})`)
+      .setFontColor("#ffffff")
+      .setBackground("#cc0000")
+      .setRanges([totalSelfRange])
+      .build();
+    rules.push(rule);
+
+    // Borders
+    peoplePublicSheet.getRange(1, categoryStartCol, peoplePublicSheet.getMaxRows(), 4)
+      .setBorder(null, null, null, true, null, null, "#333333", SpreadsheetApp.BorderStyle.SOLID_MEDIUM)
+    peoplePublicSheet.getRange(1, categoryStartCol, peoplePublicSheet.getMaxRows(), 2)
+      .setBorder(null, null, null, true, null, null, "#888888", SpreadsheetApp.BorderStyle.SOLID);
+
+    calendarStartCol += slots.length;
+    categoryStartCol += 4;
+    categoryActiveStartCol += 8;
+  }
+
+  peoplePublicSheet.setConditionalFormatRules(rules);
+
+  // - Style
+  peoplePublicSheet.getRange(1, 1, PEOPLE_HEADER_NB_ROWS, peoplePublicSheet.getMaxColumns())
+    .setHorizontalAlignment("center")
+    .setFontWeight("bold");
+  peoplePublicSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 1, peoplePublicSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS, peoplePublicSheet.getMaxColumns())
     .setVerticalAlignment("middle");
+  peoplePublicSheet.setColumnWidths(2, peoplePublicSheet.getMaxColumns() - 1, 60);
+  peoplePublicSheet.setRowHeights(1, peoplePublicSheet.getMaxRows(), 23);
 }
 
 

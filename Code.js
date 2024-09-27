@@ -58,6 +58,7 @@ function generateCalendar() {
   let peopleActiveSheet = activeSpreadsheet.getSheetByName(PEOPLE_SHEET_NAME);
   let peoplePublicSheet = publicSpreadsheet.getSheetByName(PEOPLE_SHEET_NAME);
   let parametersSheet = activeSpreadsheet.getSheetByName(PARAMETERS_SHEET_NAME);
+  updateActivePeople(peopleActiveSheet, p.categoriesSlots);
   updatePublicPeopleNames(peopleActiveSheet, peoplePublicSheet, parametersSheet);
 
   // -- Update the number of cols based on the nb of slots
@@ -373,23 +374,22 @@ function generateCalendar() {
 
   // Too many slots taken compared to the reserved ones
   // TODO fix formula & divide for the different kind of slots
-  rule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied(`
-      =OR(
-        VLOOKUP(D2; INDIRECT("${PEOPLE_SHEET_NAME}!"&A2:A); 4; FALSE) > VLOOKUP(D2; INDIRECT("${PEOPLE_SHEET_NAME}!"&A2:A); 5; FALSE);
-        VLOOKUP(D2; INDIRECT("${PEOPLE_SHEET_NAME}!"&A2:A); 8; FALSE) > VLOOKUP(D2; INDIRECT("${PEOPLE_SHEET_NAME}!"&A2:A); 9; FALSE)
-      )`) // Check if column D > E or H > I
-    .setFontColor("red")
-    .setStrikethrough(true)
-    .setRanges([calendarSlotsRange])
-    .build();
-  rules.push(rule);
+  // rule = SpreadsheetApp.newConditionalFormatRule()
+  //   .whenFormulaSatisfied(`
+  //     =OR(
+  //       VLOOKUP(D2; INDIRECT("${PEOPLE_SHEET_NAME}!"&A2:A); 4; FALSE) > VLOOKUP(D2; INDIRECT("${PEOPLE_SHEET_NAME}!"&A2:A); 5; FALSE);
+  //       VLOOKUP(D2; INDIRECT("${PEOPLE_SHEET_NAME}!"&A2:A); 8; FALSE) > VLOOKUP(D2; INDIRECT("${PEOPLE_SHEET_NAME}!"&A2:A); 9; FALSE)
+  //     )`) // Check if column Total > Paid for all categories
+  //   .setFontColor("red")
+  //   .setStrikethrough(true)
+  //   .setRanges([calendarSlotsRange])
+  //   .build();
+  // rules.push(rule);
 
   calendarSheet.setConditionalFormatRules(rules);
   log(`Conditional formal rules updated.`);
 
   // -- Update people list
-  updateActivePeople(peopleActiveSheet, p.categoriesSlots);
   updatePublicPeopleCategories(peopleActiveSheet, peoplePublicSheet, p.categoriesSlots);
 
   // -- Make sure all pending changes are applied
@@ -722,7 +722,7 @@ function updatePublicPeopleCategories(peopleActiveSheet, peoplePublicSheet, cate
     let totalLetter = columnToLetter(categoryStartCol);
     let paidLetter = columnToLetter(categoryStartCol + 1);
     let rule = SpreadsheetApp.newConditionalFormatRule()
-      .whenFormulaSatisfied(`=AND(${paidLetter}${PEOPLE_HEADER_NB_ROWS + 1}<>""; ${totalLetter}${PEOPLE_HEADER_NB_ROWS + 1} > ${paidLetter}${PEOPLE_HEADER_NB_ROWS + 1})`)
+      .whenFormulaSatisfied(`=AND(${paidLetter}${PEOPLE_HEADER_NB_ROWS + 3}<>""; ${totalLetter}${PEOPLE_HEADER_NB_ROWS + 3} > ${paidLetter}${PEOPLE_HEADER_NB_ROWS + 3})`)
       .setFontColor("#ffffff")
       .setBackground("#cc0000")
       .setRanges([totalRange])
@@ -732,7 +732,7 @@ function updatePublicPeopleCategories(peopleActiveSheet, peoplePublicSheet, cate
     let totalSelfLetter = columnToLetter(categoryStartCol + 2);
     let paidSelfLetter = columnToLetter(categoryStartCol + 3);
     rule = SpreadsheetApp.newConditionalFormatRule()
-      .whenFormulaSatisfied(`=AND(${paidSelfLetter}${PEOPLE_HEADER_NB_ROWS + 1}<>""; ${totalSelfLetter}${PEOPLE_HEADER_NB_ROWS + 1} > ${paidSelfLetter}${PEOPLE_HEADER_NB_ROWS + 1})`)
+      .whenFormulaSatisfied(`=AND(${paidSelfLetter}${PEOPLE_HEADER_NB_ROWS + 3}<>""; ${totalSelfLetter}${PEOPLE_HEADER_NB_ROWS + 3} > ${paidSelfLetter}${PEOPLE_HEADER_NB_ROWS + 3})`)
       .setFontColor("#ffffff")
       .setBackground("#cc0000")
       .setRanges([totalSelfRange])

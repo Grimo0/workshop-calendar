@@ -515,13 +515,29 @@ function updateActivePeople(peopleActiveSheet, categoriesSlots) {
 
   // -- Remove lines with an empty name
   let peopleActiveValues = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 1, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS).getDisplayValues();
-  let row = 0;
+  let rowToDelete = PEOPLE_HEADER_NB_ROWS + 1;
   for (let peopleRow of peopleActiveValues) {
     if (peopleRow[0].trim().length == 0) {
-      peopleActiveSheet.deleteRow(PEOPLE_HEADER_NB_ROWS + 1 + row);
+      log(`Delete empty row ${rowToDelete}`);
+      peopleActiveSheet.deleteRow(rowToDelete);
     }
     else {
-      row++;
+      rowToDelete++;
+    }
+  }
+
+  // -- Remove columns of the categories that don't exist anymore
+  let categoriesNameRange = peopleActiveSheet.getRange(1, 2, 1, peopleActiveSheet.getMaxColumns() - 1);
+  let categoriesRow = categoriesNameRange.getDisplayValues()[0];
+  let colToDelete = 2;
+  for (let i = 0; i < categoriesRow.length; i += 8) {
+    let category = categoriesRow[i];
+    if (!categoriesSlots.has(category)) {
+      log(`Delete unused category "${category}" from columns ${colToDelete} to ${colToDelete + 8}`);
+      peopleActiveSheet.deleteColumns(colToDelete, 8);
+    }
+    else {
+      colToDelete += 8;
     }
   }
 

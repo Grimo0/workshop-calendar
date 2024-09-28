@@ -44,7 +44,7 @@ function generateCalendar() {
 
   let activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
   let saveSheet = activeSpreadsheet.getSheetByName(SAVE_SHEET_NAME);
-  let p = new GenerateParameters(activeSpreadsheet, publicSpreadsheet);
+  let p = new GenerateParameters(activeSpreadsheet);
 
   let weekCol = 1;
 
@@ -53,6 +53,8 @@ function generateCalendar() {
   messageRange.setValue("MISE À JOUR EN COURS, PATIENTEZ");
   let errorRange = activeSpreadsheet.getSheetByName(HOMEPAGE_SHEET_NAME).getRange(3, 2);
   errorRange.setValue("MISE À JOUR EN COURS, ne PAS fermer la page");
+
+  // TODO Remove past closed times
 
   // -- Update people public list
   let peopleActiveSheet = activeSpreadsheet.getSheetByName(PEOPLE_SHEET_NAME);
@@ -88,6 +90,8 @@ function generateCalendar() {
     CALENDAR_HEADER_NB_ROWS + 1, weekCol,
     calendarSheet.getMaxRows() - CALENDAR_HEADER_NB_ROWS, calendarSheet.getMaxColumns() - weekCol + 1
   );
+
+  // TODO Ensure the saveSheet has enough rows and columns
 
   let savedValues = calendarRange.getDisplayValues();
   let saveRange = saveSheet.getRange(1, 1, calendarRange.getNumRows(), calendarRange.getNumColumns())
@@ -135,9 +139,10 @@ function generateCalendar() {
     let newDataValidations = [];
 
     // -- Add weeks calendars, starting from current
+    const nbCols = calendarSheet.getMaxColumns() - weekCol + 1;
+    log(`Start adding weeks with ${nbCols} cols.`);
     let year = p.today.getFullYear();
     let weekNo = getWeekNumber(p.today);
-    const nbCols = calendarSheet.getMaxColumns() - weekCol + 1;
     for (let weekIdx = 0; weekIdx < p.weeksToDisplay; weekIdx++) {
 
       // Make sure weekNo is valid
@@ -315,25 +320,82 @@ function generateCalendar() {
     // -- Update people past days counts (last so we don't count them if something went bad)
     if (UPDATE_PEOPLE_PAST_DAYS) {
       log(`Incrementing people past days.`);
+
+      let peopleNamesActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 1, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS);
+      let peopleNamesRows = peopleNamesActiveRange.getDisplayValues();
+
+      /** @type {Map<String, Number>} */
+      let peopleToRow = new Map();
+      peopleNamesRows.forEach((v, i) => peopleToRow.set(formatName(v), i));
+
+      /** @type {Map<String, Number>} */
+      let categoriesSize = new Map();
+
+      /** @type {Map<String, GoogleAppsScript.Spreadsheet.Range>} */
+      let pastDaysActiveRange = new Map();
+      /** @type {Map<String, Number[][]>} */
+      let pastDaysActiveValues = new Map();
+      /** @type {Map<String, GoogleAppsScript.Spreadsheet.Range>} */
+      let pastSelfDaysActiveRange = new Map();
+      /** @type {Map<String, Number[][]>} */
+      let pastSelfDaysActiveValues = new Map();
+
+      let categoryStartCol = 2;
+      for (let [category, slots] of p.categoriesSlots) {
+        categoriesSize.set(category, slots.length);
+
+        let pastDaysRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, categoryStartCol, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS);
+        pastDaysActiveRange.set(category, pastDaysRange);
+        pastDaysActiveValues.set(category, getValuesAsNumber(pastDaysRange));
+
+        let pastSelfDaysRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, categoryStartCol + 4, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS);
+        pastSelfDaysActiveRange.set(category, pastSelfDaysRange);
+        pastSelfDaysActiveValues.set(category, getValuesAsNumber(pastSelfDaysRange));
+
+        categoryStartCol += 8;
+      }
+
       for (const [[b, e], r] of savedDaysMap) {
         if (e.getTime() <= p.today.getTime()) {
-          for (let i = CALENDAR.SLOT; i < r.length; i++) {
-            p.addPastDay(formatName(r[i]), i - CALENDAR.SLOT, false);
+          let col = CALENDAR.SLOT;
+
+          for (let [category, slots] of p.categoriesSlots) {
+            for (let i = 0; i < slots.length; i++) {
+              let name = formatName(r[col + i]);
+              if (name == "" || name == p.freeSlotCell.getDisplayValue() || name == p.unavailableSlotCell.getDisplayValue())
+                continue;
+
+              let row = peopleToRow.get(name);
+              pastDaysActiveValues.get(category)[row][0] += 1;
+            }
+
+            col += slots.length;
           }
         }
       }
       for (const [[b, e], r] of savedSelfDaysMap) {
         if (e.getTime() <= p.today.getTime()) {
-          for (let i = CALENDAR.SLOT; i < r.length; i++) {
-            p.addPastDay(formatName(r[i]), i - CALENDAR.SLOT, true);
+          let col = CALENDAR.SLOT;
+
+          for (let [category, slots] of p.categoriesSlots) {
+            for (let i = 0; i < slots.length; i++) {
+              let name = formatName(r[col + i]);
+              if (name == "" || name == p.freeSlotCell.getDisplayValue() || name == p.unavailableSlotCell.getDisplayValue())
+                continue;
+
+              let row = peopleToRow.get(name);
+              pastSelfDaysActiveValues.get(category)[row][0] += 1;
+            }
+
+            col += slots.length;
           }
         }
       }
 
-      p.ceramistsPastDaysActiveRange.setValues(p.ceramistsPastDays);
-      p.ceramistsSelfPastDaysActiveRange.setValues(p.ceramistsSelfPastDays);
-      p.modelersPastDaysActiveRange.setValues(p.modelersPastDays);
-      p.modelersSelfPastDaysActiveRange.setValues(p.modelersSelfPastDays);
+      for (let [category, slots] of p.categoriesSlots) {
+        pastDaysActiveRange.get(category).setValues(pastDaysActiveValues.get(category));
+        pastSelfDaysActiveRange.get(category).setValues(pastSelfDaysActiveValues.get(category));
+      }
       log(`People past days updated.`);
     }
 
@@ -374,6 +436,7 @@ function generateCalendar() {
 
   // Too many slots taken compared to the reserved ones
   // TODO fix formula & divide for the different kind of slots
+  // TODO Add the same formula on the name in people sheets
   // rule = SpreadsheetApp.newConditionalFormatRule()
   //   .whenFormulaSatisfied(`
   //     =OR(
@@ -389,7 +452,7 @@ function generateCalendar() {
   calendarSheet.setConditionalFormatRules(rules);
   log(`Conditional formal rules updated.`);
 
-  // -- Update people list
+  // -- Update public people categories (only now because we need the past days to have been updated)
   updatePublicPeopleCategories(peopleActiveSheet, peoplePublicSheet, p.categoriesSlots);
 
   // -- Make sure all pending changes are applied
@@ -916,7 +979,7 @@ function createOpeningRow(nbCols, openingTime, begin, end, p, savedMap = null) {
 
     // Add the saved data and fill the other slots with FreeSlot
     if (savedRow) {
-      for (let i = CALENDAR.SLOT; i < savedRow.length; i++) {
+      for (let i = CALENDAR.SLOT; i < Math.min(nbCols, savedRow.length); i++) {
         newRow[i] = formatName(savedRow[i]);
         if (newRow[i] == "")
           newRow[i] = p.freeSlotCell.getDisplayValue();
@@ -926,14 +989,14 @@ function createOpeningRow(nbCols, openingTime, begin, end, p, savedMap = null) {
       }
     }
     else {
-      for (let i = 0; i < nbCols; i++) {
-        newRow[CALENDAR.SLOT + i] = p.freeSlotCell.getDisplayValue();
+      for (let i = CALENDAR.SLOT; i < nbCols; i++) {
+        newRow[i] = p.freeSlotCell.getDisplayValue();
       }
     }
   }
   else {
-    for (let i = 0; i < nbCols; i++) {
-      newRow[CALENDAR.SLOT + i] = p.freeSlotCell.getDisplayValue();
+    for (let i = CALENDAR.SLOT; i < nbCols; i++) {
+      newRow[i] = p.freeSlotCell.getDisplayValue();
     }
   }
 

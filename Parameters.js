@@ -97,11 +97,9 @@ class GenerateParameters {
 
   /**
    * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} activeSpreadsheet
-   * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} publicSpreadsheet
    */
-  constructor(activeSpreadsheet, publicSpreadsheet) {
+  constructor(activeSpreadsheet) {
 
-    let peopleActiveSheet = activeSpreadsheet.getSheetByName(PEOPLE_SHEET_NAME);
     let parametersSheet = activeSpreadsheet.getSheetByName(PARAMETERS_SHEET_NAME);
 
     // -- Set the current date
@@ -119,24 +117,6 @@ class GenerateParameters {
       let slotsValues = getFlatDisplayValues(categoriesSheet.getRange(1 + i, 1, 1, categoriesSheet.getMaxColumns()));
       this.categoriesSlots.set(slotsValues.shift(), slotsValues);
     }
-
-    // -- People data
-    // Names
-    this.peopleNamesActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 1, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS);
-    this.peopleNames = getFlatDisplayValues(this.peopleNamesActiveRange);
-
-    // Past days
-    this.ceramistsPastDaysActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 2, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS);
-    this.ceramistsPastDays = getValuesAsNumber(this.ceramistsPastDaysActiveRange);
-
-    this.ceramistsSelfPastDaysActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 6, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS);
-    this.ceramistsSelfPastDays = getValuesAsNumber(this.ceramistsSelfPastDaysActiveRange);
-
-    this.modelersPastDaysActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 10, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS);
-    this.modelersPastDays = getValuesAsNumber(this.modelersPastDaysActiveRange);
-
-    this.modelersSelfPastDaysActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 14, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS);
-    this.modelersSelfPastDays = getValuesAsNumber(this.modelersSelfPastDaysActiveRange);
 
     // -- Special cells
     this.freeSlotCell = parametersSheet.getRange(4, 2).getCell(1, 1);
@@ -258,35 +238,5 @@ class GenerateParameters {
       }
     }
     return false;
-  }
-
-
-  /**
-   * @param {String} peopleName
-   * @param {number} slot
-   * @param {boolean} self
-   * @param {number} days number of past days to add, default to 1.
-   */
-  addPastDay(peopleName, slot, self, days = 1) {
-    if (peopleName == "" || peopleName == this.freeSlotCell.getDisplayValue() || peopleName == this.unavailableSlotCell.getDisplayValue())
-      return;
-
-    let peopleNamesRows = this.peopleNamesActiveRange.getDisplayValues();
-    for (let row = 0; row < peopleNamesRows.length; row++) {
-      if (peopleNamesRows[row][0] == peopleName) {
-        if (slot < 3) { // TODO Change ceramists etc
-          if (self)
-            this.ceramistsSelfPastDays[row][0] += days;
-          else
-            this.ceramistsPastDays[row][0] += days;
-        } else if (slot < 5) {
-          if (self)
-            this.modelersSelfPastDays[row][0] += days;
-          else
-            this.modelersPastDays[row][0] += days;
-        }
-        return;
-      }
-    }
   }
 }

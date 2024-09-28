@@ -89,7 +89,13 @@ function generateCalendar() {
     calendarSheet.getMaxRows() - CALENDAR_HEADER_NB_ROWS, calendarSheet.getMaxColumns() - weekCol + 1
   );
 
-  // TODO Ensure the saveSheet has enough rows and columns
+  // Ensure the saveSheet has enough rows and columns
+  if (saveSheet.getMaxRows() < calendarRange.getNumRows()) {
+    saveSheet.insertRowsAfter(saveSheet.getMaxRows(), calendarRange.getNumRows() - saveSheet.getMaxRows());
+  }
+  if (saveSheet.getMaxColumns() < calendarRange.getNumColumns()) {
+    saveSheet.insertColumnsAfter(saveSheet.getMaxColumns(), calendarRange.getNumColumns() - saveSheet.getMaxColumns());
+  }
 
   let savedValues = calendarRange.getDisplayValues();
   let saveRange = saveSheet.getRange(1, 1, calendarRange.getNumRows(), calendarRange.getNumColumns())

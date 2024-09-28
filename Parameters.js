@@ -97,8 +97,9 @@ class GenerateParameters {
 
   /**
    * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} activeSpreadsheet
+   * @param {Boolean} removeOldClosedTimes
    */
-  constructor(activeSpreadsheet) {
+  constructor(activeSpreadsheet, removeOldClosedTimes) {
 
     let parametersSheet = activeSpreadsheet.getSheetByName(PARAMETERS_SHEET_NAME);
 
@@ -167,14 +168,15 @@ class GenerateParameters {
     }
 
     // -- Closed times
+    let closedRowIdx = 3;
     let closedSheet = activeSpreadsheet.getSheetByName(CLOSED_SHEET_NAME);
-    let closedRange = closedSheet.getRange(3, 1, closedSheet.getMaxRows() - 2, 4);
-    let closedValues = closedRange.getDisplayValues();
+    let closedValues = closedSheet.getRange(3, 1, closedSheet.getMaxRows() - 2, 4).getDisplayValues();
     /** @type {ClosedTime[]} */
     this.closedTimes = Array();
     for (let closedRow of closedValues) {
       if (closedRow[0].length == 0)
         break;
+
       let begin = new Date()
       updateDate(begin, closedRow[CLOSED.BEGIN_DAY]);
       updateTime(begin, closedRow[CLOSED.BEGIN_HOUR]);
@@ -183,7 +185,8 @@ class GenerateParameters {
       if (closedRow[CLOSED.END_DAY].length == 0) {
         end.setFullYear(begin.getFullYear(), begin.getMonth(), begin.getDate() + 1);
         end.setHours(0, 0, 0);
-      } else {
+      }
+      else {
         updateDate(end, closedRow[CLOSED.END_DAY]);
 
         if (closedRow[CLOSED.END_HOUR] == "") {
@@ -192,6 +195,14 @@ class GenerateParameters {
         } else {
           updateTime(end, closedRow[CLOSED.END_HOUR]);
         }
+      }
+
+      if (removeOldClosedTimes && end.getTime() < this.today.getTime()) {
+        closedSheet.deleteRow(closedRowIdx);
+        closedSheet.insertRowAfter(closedSheet.getMaxRows());
+      }
+      else {
+        closedRowIdx++;
       }
 
       this.closedTimes.push(new ClosedTime(begin, end));

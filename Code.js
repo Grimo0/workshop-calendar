@@ -44,7 +44,7 @@ function generateCalendar() {
 
   let activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
   let saveSheet = activeSpreadsheet.getSheetByName(SAVE_SHEET_NAME);
-  let p = new GenerateParameters(activeSpreadsheet);
+  let p = new GenerateParameters(activeSpreadsheet, true);
 
   let weekCol = 1;
 
@@ -53,8 +53,6 @@ function generateCalendar() {
   messageRange.setValue("MISE À JOUR EN COURS, PATIENTEZ");
   let errorRange = activeSpreadsheet.getSheetByName(HOMEPAGE_SHEET_NAME).getRange(3, 2);
   errorRange.setValue("MISE À JOUR EN COURS, ne PAS fermer la page");
-
-  // TODO Remove past closed times
 
   // -- Update people public list
   let peopleActiveSheet = activeSpreadsheet.getSheetByName(PEOPLE_SHEET_NAME);

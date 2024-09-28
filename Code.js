@@ -440,7 +440,6 @@ function generateCalendar() {
 
   // Too many slots taken compared to the reserved ones
   // TODO fix formula & divide for the different kind of slots
-  // TODO Add the same formula on the name in people sheets
   // rule = SpreadsheetApp.newConditionalFormatRule()
   //   .whenFormulaSatisfied(`
   //     =OR(
@@ -514,7 +513,8 @@ function updateActivePeople(peopleActiveSheet, categoriesSlots) {
   info(`Update active people`);
 
   // -- Remove lines with an empty name
-  let peopleActiveValues = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 1, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS).getDisplayValues();
+  let peopleActiveRange = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 1, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS);
+  let peopleActiveValues = peopleActiveRange.getDisplayValues();
   let rowToDelete = PEOPLE_HEADER_NB_ROWS + 1;
   for (let peopleRow of peopleActiveValues) {
     if (peopleRow[0].trim().length == 0) {
@@ -578,11 +578,14 @@ function updateActivePeople(peopleActiveSheet, categoriesSlots) {
       .setValue(0);
   }
 
+  // -- Update each category
   let categoryStartCol = 2;
   let calendarStartCol = CALENDAR.SLOT;
   let rules = [];
 
-  // -- Update each category
+  /** @type {String[]} */
+  let unpaidFormulas = [];
+
   for (let [category, slots] of categoriesSlots) {
     // - Header
     peopleActiveSheet.getRange(1, categoryStartCol, 1, 8)
@@ -676,9 +679,22 @@ function updateActivePeople(peopleActiveSheet, categoriesSlots) {
     peopleActiveSheet.getRange(1, categoryStartCol, peopleActiveSheet.getMaxRows(), 4)
       .setBorder(null, null, null, true, null, null, "#888888", SpreadsheetApp.BorderStyle.SOLID);
 
+    // -- Formula
+    unpaidFormulas.push(`
+      ${totalLetter}${PEOPLE_HEADER_NB_ROWS + 1} > ${paidLetter}${PEOPLE_HEADER_NB_ROWS + 1};
+      ${totalSelfLetter}${PEOPLE_HEADER_NB_ROWS + 1} > ${paidSelfLetter}${PEOPLE_HEADER_NB_ROWS + 1}
+      `);
+
     calendarStartCol += slots.length;
     categoryStartCol += 8;
   }
+
+  let rule = SpreadsheetApp.newConditionalFormatRule()
+    .whenFormulaSatisfied(`=OR(${unpaidFormulas.join(";")})`) // Check if column Total > Paid for all categories
+    .setFontColor("red")
+    .setRanges([peopleActiveRange])
+    .build();
+  rules.push(rule);
 
   peopleActiveSheet.setConditionalFormatRules(rules);
 
@@ -759,6 +775,9 @@ function updatePublicPeopleCategories(peopleActiveSheet, peoplePublicSheet, cate
   let categoryActiveStartCol = 2;
   let calendarStartCol = CALENDAR.SLOT;
   let rules = [];
+
+  /** @type {String[]} */
+  let unpaidFormulas = [];
 
   for (let [category, slots] of categoriesSlots) {
     // - Header
@@ -848,10 +867,23 @@ function updatePublicPeopleCategories(peopleActiveSheet, peoplePublicSheet, cate
     peoplePublicSheet.getRange(1, categoryStartCol, peoplePublicSheet.getMaxRows(), 2)
       .setBorder(null, null, null, true, null, null, "#888888", SpreadsheetApp.BorderStyle.SOLID);
 
+    // -- Formula
+    unpaidFormulas.push(`
+    ${totalLetter}${PEOPLE_HEADER_NB_ROWS + 3} > ${paidLetter}${PEOPLE_HEADER_NB_ROWS + 3};
+    ${totalSelfLetter}${PEOPLE_HEADER_NB_ROWS + 3} > ${paidSelfLetter}${PEOPLE_HEADER_NB_ROWS + 3}
+    `);
+
     calendarStartCol += slots.length;
     categoryStartCol += 4;
     categoryActiveStartCol += 8;
   }
+
+  let rule = SpreadsheetApp.newConditionalFormatRule()
+    .whenFormulaSatisfied(`=OR(${unpaidFormulas.join(";")})`) // Check if column Total > Paid for all categories
+    .setFontColor("red")
+    .setRanges([peoplePublicSheet.getRange(PEOPLE_HEADER_NB_ROWS + 3, 1, peoplePublicSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS -2)])
+    .build();
+  rules.push(rule);
 
   peoplePublicSheet.setConditionalFormatRules(rules);
 

@@ -118,7 +118,7 @@ function generateCalendar() {
 
     // Dropdown validation rules
     let peoplePublicSheet = publicSpreadsheet.getSheetByName(PEOPLE_SHEET_NAME);
-    let peopleNamePublicRange = peoplePublicSheet.getRange(2, 1, peoplePublicSheet.getMaxRows() - 1);
+    let peopleNamePublicRange = peoplePublicSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 1, peoplePublicSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS);
     let peopleRule = SpreadsheetApp.newDataValidation()
       .requireValueInRange(peopleNamePublicRange)
       .setAllowInvalid(false)
@@ -412,6 +412,9 @@ function generateCalendar() {
     messageRange.setValue(`Erreur prevenir Grégoire ou Karo, ne rien toucher.`);
   }
 
+  // -- Update public people categories (only now because we need the past days to have been updated)
+  updatePublicPeopleCategories(peopleActiveSheet, peoplePublicSheet, p.categoriesSlots);
+
   // -- Set conditional format rules
   let calendarSlotsRange = calendarSheet.getRange(
     CALENDAR_HEADER_NB_ROWS + 1,
@@ -439,24 +442,39 @@ function generateCalendar() {
   rules.push(rule);
 
   // Too many slots taken compared to the reserved ones
-  // TODO fix formula & divide for the different kind of slots
-  // rule = SpreadsheetApp.newConditionalFormatRule()
-  //   .whenFormulaSatisfied(`
-  //     =OR(
-  //       VLOOKUP(D2; INDIRECT("${PEOPLE_SHEET_NAME}!"&A2:A); 4; FALSE) > VLOOKUP(D2; INDIRECT("${PEOPLE_SHEET_NAME}!"&A2:A); 5; FALSE);
-  //       VLOOKUP(D2; INDIRECT("${PEOPLE_SHEET_NAME}!"&A2:A); 8; FALSE) > VLOOKUP(D2; INDIRECT("${PEOPLE_SHEET_NAME}!"&A2:A); 9; FALSE)
-  //     )`) // Check if column Total > Paid for all categories
-  //   .setFontColor("red")
-  //   .setStrikethrough(true)
-  //   .setRanges([calendarSlotsRange])
-  //   .build();
-  // rules.push(rule);
+  let categoryStartCol = 2;
+  let calendarStartCol = weekCol + CALENDAR.SLOT;
+  let lastColName = columnToLetter(peoplePublicSheet.getMaxColumns());
+  let peopleIndirect = `INDIRECT("${PEOPLE_SHEET_NAME}!$A${PEOPLE_HEADER_NB_ROWS + 3}:$${lastColName}")`;
+  for (let [category, slots] of p.categoriesSlots) {
+    let firstColName = columnToLetter(calendarStartCol);
+    let unpaidFormula = `
+      AND($A${CALENDAR_HEADER_NB_ROWS + 1} = "${OPENING_TYPE.REGULAR}"; VLOOKUP(${firstColName}${CALENDAR_HEADER_NB_ROWS + 1}; ${peopleIndirect}; ${categoryStartCol}; FALSE)
+        > VLOOKUP(${firstColName}${CALENDAR_HEADER_NB_ROWS + 1}; ${peopleIndirect}; ${categoryStartCol + 1}; FALSE));
+      AND($A${CALENDAR_HEADER_NB_ROWS + 1} = "${OPENING_TYPE.SELF}"; VLOOKUP(${firstColName}${CALENDAR_HEADER_NB_ROWS + 1}; ${peopleIndirect}; ${categoryStartCol + 2}; FALSE)
+        > VLOOKUP(${firstColName}${CALENDAR_HEADER_NB_ROWS + 1}; ${peopleIndirect}; ${categoryStartCol + 3}; FALSE))
+    `;
+
+    let range = calendarSheet.getRange(
+      CALENDAR_HEADER_NB_ROWS + 1,
+      calendarStartCol,
+      calendarRange.getNumRows() - CALENDAR_HEADER_NB_ROWS,
+      slots.length);
+
+    // Check if column Total > Paid for all categories
+    rule = SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied(`=OR(${unpaidFormula})`) // Check if column Total > Paid for all categories
+      .setFontColor("red")
+      .setStrikethrough(true)
+      .setRanges([range])
+      .build();
+    rules.push(rule);
+    categoryStartCol += 4;
+    calendarStartCol += slots.length;
+  }
 
   calendarSheet.setConditionalFormatRules(rules);
   log(`Conditional formal rules updated.`);
-
-  // -- Update public people categories (only now because we need the past days to have been updated)
-  updatePublicPeopleCategories(peopleActiveSheet, peoplePublicSheet, p.categoriesSlots);
 
   // -- Make sure all pending changes are applied
   SpreadsheetApp.flush();
@@ -751,21 +769,7 @@ function updatePublicPeopleNames(peopleActiveSheet, peoplePublicSheet, parameter
 function updatePublicPeopleCategories(peopleActiveSheet, peoplePublicSheet, categoriesSlots) {
   info("Update public people list");
 
-  // -- Remove columns of the categories that don't exist anymore
-  let categoriesRow = peoplePublicSheet.getRange(1, 2, 1, peoplePublicSheet.getMaxColumns() - 1).getDisplayValues()[0];
-  let colToDelete = 2;
-  for (let i = 0; i < categoriesRow.length; i += 4) {
-    let category = categoriesRow[i];
-    if (!categoriesSlots.has(category)) {
-      log(`Delete unused public category "${category}" from columns ${colToDelete} to ${colToDelete + 4}`);
-      peoplePublicSheet.deleteColumns(colToDelete, 4);
-    }
-    else {
-      colToDelete += 4;
-    }
-  }
-
-  // Make sure we have enought columns or create the missing ones and init them
+  // -- Make sure we have enought columns or create the missing ones
   if (peoplePublicSheet.getMaxColumns() < 1 + 4 * categoriesSlots.size) {
     peoplePublicSheet.insertColumnsAfter(peoplePublicSheet.getMaxColumns(), 1 + 4 * categoriesSlots.size - peoplePublicSheet.getMaxColumns());
   }
@@ -869,8 +873,8 @@ function updatePublicPeopleCategories(peopleActiveSheet, peoplePublicSheet, cate
 
     // -- Formula
     unpaidFormulas.push(`
-    ${totalLetter}${PEOPLE_HEADER_NB_ROWS + 3} > ${paidLetter}${PEOPLE_HEADER_NB_ROWS + 3};
-    ${totalSelfLetter}${PEOPLE_HEADER_NB_ROWS + 3} > ${paidSelfLetter}${PEOPLE_HEADER_NB_ROWS + 3}
+      ${totalLetter}${PEOPLE_HEADER_NB_ROWS + 3} > ${paidLetter}${PEOPLE_HEADER_NB_ROWS + 3};
+      ${totalSelfLetter}${PEOPLE_HEADER_NB_ROWS + 3} > ${paidSelfLetter}${PEOPLE_HEADER_NB_ROWS + 3}
     `);
 
     calendarStartCol += slots.length;
@@ -881,7 +885,7 @@ function updatePublicPeopleCategories(peopleActiveSheet, peoplePublicSheet, cate
   let rule = SpreadsheetApp.newConditionalFormatRule()
     .whenFormulaSatisfied(`=OR(${unpaidFormulas.join(";")})`) // Check if column Total > Paid for all categories
     .setFontColor("red")
-    .setRanges([peoplePublicSheet.getRange(PEOPLE_HEADER_NB_ROWS + 3, 1, peoplePublicSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS -2)])
+    .setRanges([peoplePublicSheet.getRange(PEOPLE_HEADER_NB_ROWS + 3, 1, peoplePublicSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS - 2)])
     .build();
   rules.push(rule);
 
@@ -895,6 +899,20 @@ function updatePublicPeopleCategories(peopleActiveSheet, peoplePublicSheet, cate
     .setVerticalAlignment("middle");
   peoplePublicSheet.setColumnWidths(2, peoplePublicSheet.getMaxColumns() - 1, 60);
   peoplePublicSheet.setRowHeights(1, peoplePublicSheet.getMaxRows(), 23);
+
+  // -- Remove columns of the categories that don't exist anymore
+  let categoriesRow = peoplePublicSheet.getRange(1, 2, 1, peoplePublicSheet.getMaxColumns() - 1).getDisplayValues()[0];
+  let colToDelete = 2;
+  for (let i = 0; i < categoriesRow.length; i += 4) {
+    let category = categoriesRow[i];
+    if (!categoriesSlots.has(category)) {
+      log(`Delete unused public category "${category}" from columns ${colToDelete} to ${colToDelete + 4}`);
+      peoplePublicSheet.deleteColumns(colToDelete, 4);
+    }
+    else {
+      colToDelete += 4;
+    }
+  }
 }
 
 

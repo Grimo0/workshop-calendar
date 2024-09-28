@@ -513,11 +513,19 @@ function updatePeopleOnly() {
 function updateActivePeople(peopleActiveSheet, categoriesSlots) {
   info(`Update active people`);
 
-  // TODO Remove lines with an empty name
+  // -- Remove lines with an empty name
+  let peopleActiveValues = peopleActiveSheet.getRange(PEOPLE_HEADER_NB_ROWS + 1, 1, peopleActiveSheet.getMaxRows() - PEOPLE_HEADER_NB_ROWS).getDisplayValues();
+  let row = 0;
+  for (let peopleRow of peopleActiveValues) {
+    if (peopleRow[0].trim().length == 0) {
+      peopleActiveSheet.deleteRow(PEOPLE_HEADER_NB_ROWS + 1 + row);
+    }
+    else {
+      row++;
+    }
+  }
 
-  // TODO Remove columns of the categories that don't exist anymore
-
-  // Make sure we have enought columns or create the missing ones and init them
+  // -- Make sure we have enought columns or create the missing ones and init them
   if (peopleActiveSheet.getMaxColumns() < 1 + 8 * categoriesSlots.size) {
     let categoryStartCol = peopleActiveSheet.getMaxColumns() + 1;
 
@@ -559,6 +567,7 @@ function updateActivePeople(peopleActiveSheet, categoriesSlots) {
   let calendarStartCol = CALENDAR.SLOT;
   let rules = [];
 
+  // -- Update each category
   for (let [category, slots] of categoriesSlots) {
     // - Header
     peopleActiveSheet.getRange(1, categoryStartCol, 1, 8)
@@ -658,7 +667,7 @@ function updateActivePeople(peopleActiveSheet, categoriesSlots) {
 
   peopleActiveSheet.setConditionalFormatRules(rules);
 
-  // - Style
+  // -- Style
   peopleActiveSheet.getRange(1, 1, PEOPLE_HEADER_NB_ROWS, peopleActiveSheet.getMaxColumns())
     .setHorizontalAlignment("center")
     .setFontWeight("bold");

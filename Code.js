@@ -527,13 +527,12 @@ function updateActivePeople(peopleActiveSheet, categoriesSlots) {
   }
 
   // -- Remove columns of the categories that don't exist anymore
-  let categoriesNameRange = peopleActiveSheet.getRange(1, 2, 1, peopleActiveSheet.getMaxColumns() - 1);
-  let categoriesRow = categoriesNameRange.getDisplayValues()[0];
+  let categoriesRow = peopleActiveSheet.getRange(1, 2, 1, peopleActiveSheet.getMaxColumns() - 1).getDisplayValues()[0];
   let colToDelete = 2;
   for (let i = 0; i < categoriesRow.length; i += 8) {
     let category = categoriesRow[i];
     if (!categoriesSlots.has(category)) {
-      log(`Delete unused category "${category}" from columns ${colToDelete} to ${colToDelete + 8}`);
+      log(`Delete unused active category "${category}" from columns ${colToDelete} to ${colToDelete + 8}`);
       peopleActiveSheet.deleteColumns(colToDelete, 8);
     }
     else {
@@ -736,7 +735,19 @@ function updatePublicPeopleNames(peopleActiveSheet, peoplePublicSheet, parameter
 function updatePublicPeopleCategories(peopleActiveSheet, peoplePublicSheet, categoriesSlots) {
   info("Update public people list");
 
-  // TODO Remove columns of the categories that don't exist anymore
+  // -- Remove columns of the categories that don't exist anymore
+  let categoriesRow = peoplePublicSheet.getRange(1, 2, 1, peoplePublicSheet.getMaxColumns() - 1).getDisplayValues()[0];
+  let colToDelete = 2;
+  for (let i = 0; i < categoriesRow.length; i += 4) {
+    let category = categoriesRow[i];
+    if (!categoriesSlots.has(category)) {
+      log(`Delete unused public category "${category}" from columns ${colToDelete} to ${colToDelete + 4}`);
+      peoplePublicSheet.deleteColumns(colToDelete, 4);
+    }
+    else {
+      colToDelete += 4;
+    }
+  }
 
   // Make sure we have enought columns or create the missing ones and init them
   if (peoplePublicSheet.getMaxColumns() < 1 + 4 * categoriesSlots.size) {

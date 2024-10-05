@@ -359,8 +359,10 @@ function generateCalendar() {
         categoryStartCol += 8;
       }
 
+      const dateOfThisWeek = getDateOfWeek(getWeekNumber(p.today), p.today.getFullYear());
+      log(`Adding a day for all slots before the ${dateOfThisWeek}`);
       for (const [[b, e], r] of savedDaysMap) {
-        if (e.getTime() <= p.today.getTime()) {
+        if (e.getTime() <= dateOfThisWeek.getTime()) {
           let col = CALENDAR.SLOT;
 
           for (let [category, slots] of p.categoriesSlots) {
@@ -378,7 +380,7 @@ function generateCalendar() {
         }
       }
       for (const [[b, e], r] of savedSelfDaysMap) {
-        if (e.getTime() <= p.today.getTime()) {
+        if (e.getTime() <= dateOfThisWeek.getTime()) {
           let col = CALENDAR.SLOT;
 
           for (let [category, slots] of p.categoriesSlots) {
@@ -475,6 +477,8 @@ function generateCalendar() {
 
   calendarSheet.setConditionalFormatRules(rules);
   log(`Conditional formal rules updated.`);
+
+  // TODO Make sure the locked free area correspond to all the slots columns
 
   // -- Make sure all pending changes are applied
   SpreadsheetApp.flush();
